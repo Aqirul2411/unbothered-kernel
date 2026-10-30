@@ -53,17 +53,33 @@ fastboot reboot
 Never `fastboot flash` a raw kernel `Image` onto `boot` — it expects a packed
 boot image.
 
-### The zip carries a tuning script; the Image does not
+### The zip only carries the tuning script when `boot` has a ramdisk
 
-The packaging step of the pinned build always injects `ramdisk/sbin/vortex.sh`
-into the zip's ramdisk, and that script turns thermals off, forces the
-`performance` governor, sets `panic=0` and silences printk at every boot.
+The pinned AnyKernel3 (`BLOCK=boot`, `IS_SLOT_DEVICE=auto`) has two install
+paths, and which one runs depends on your phone's partition layout:
 
-For the first boot of a new kernel you want the opposite of that last one: if it
-hangs, `printk` silenced means no log at all. So for testing, prefer the
-`fastboot`/`magiskboot` route above with just `Image`: it keeps your existing
-ramdisk, which has no `vortex.sh` in it. Use the zip once the kernel is known to
-boot.
+| `boot` contains | what the installer does |
+|---|---|
+| kernel only (GKI + separate `init_boot`, Android 13+) | `flash_boot`: writes the kernel, nothing else |
+| kernel + ramdisk | injects `ramdisk/sbin/vortex.sh` and rewrites the boot image |
+
+`marble` shipped with Android 13, so the expected path is `flash_boot`: the
+flashable is a kernel-only install, your ramdisk is untouched, and the
+thermal/printk script is not injected. When `vortex.sh` *is* injected, it turns
+thermals off, forces the `performance` governor, sets `panic=0` and silences
+printk at every boot — and for a kernel you are still testing, silencing printk
+means a hang produces no log at all.
+
+Two things to know before flashing from recovery:
+
+- the installer aborts if the **running** kernel version is not in
+  `5.10 6.1 6.6`, and in recovery "running kernel" is the recovery's own kernel,
+  not your installed one. A recovery built on a 4.19 or 6.12 kernel will refuse;
+- it writes the **current slot** only, and never touches `init_boot`,
+  `vendor_boot`, `dtbo` or `vbmeta`.
+
+`docs/BOOT-TEST.md` covers the backup and the rollback, which is the part that
+matters more than the flash.
 
 ## 3. First boot checks
 
