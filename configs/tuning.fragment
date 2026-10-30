@@ -40,6 +40,9 @@ CONFIG_ZRAM=y
 # symbols listed here, and a side effect nobody wrote down is a side effect
 # nobody agreed to.
 CONFIG_ZSMALLOC=y
+# zram's lzo-rle compressor pulls this in. First build failed verification
+# precisely because it was not written here, which is the mechanism working.
+CONFIG_CRYPTO_LZO=y
 
 # ---------------------------------------------------------------------------
 # 3. Debug symbols are not built.
@@ -47,5 +50,13 @@ CONFIG_ZSMALLOC=y
 # CONFIG_DEBUG_INFO with DWARF4 is ~1 GB of vmlinux nobody ships. It does not
 # change the Image at all, it only makes every build slower and every artifact
 # bigger. Turning it off is free.
+#
+# The two lines after it are not settings, they are the symbols that stop
+# existing once DEBUG_INFO is off. They are listed so the verifier's record of
+# this build is complete: it tolerates a change only if the change is written
+# here, and "the config dropped an option because its parent went away" is still
+# a change.
 # ---------------------------------------------------------------------------
 # CONFIG_DEBUG_INFO is not set
+# CONFIG_GDB_SCRIPTS is not set
+# CONFIG_DEBUG_EFI is not set

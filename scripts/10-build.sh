@@ -80,6 +80,11 @@ rm -f "$WORK/tuning.fragment"
 if [ "$IDENTITY" = "own" ]; then
   cp "$ROOT/configs/tuning.fragment" "$WORK/tuning.fragment"
   say "tuning: $(grep -cE '^(CONFIG_|# CONFIG_)' "$WORK/tuning.fragment") settings from configs/tuning.fragment"
+
+  # The recovery banner. AnyKernel3 prints this text at install time, and the
+  # pinned AnyKernel3 draws Arkael's name in it. `repro` keeps Arkael's, because
+  # repro is supposed to be indistinguishable from the phone's kernel.
+  cp "$ROOT/assets/banner" "$WORK/banner"
 fi
 
 # --- edit the pinned build script ------------------------------------------
@@ -229,6 +234,9 @@ edit("anykernel clone",
          "git clone -q --depth=1 $ANYKERNEL_REPO -b $ANYKERNEL_BRANCH anykernel",
          "git -C anykernel fetch -q --depth=64 origin $ANYKERNEL_BRANCH",
          "git -C anykernel checkout -q %s" % want("ANYKERNEL_SHA"),
+         # The install-time banner is text, printed by AK3's update-binary.
+         # Only present for `own`; see the copy step earlier in this script.
+         '[ -f "$WORKDIR/banner" ] && cp -f "$WORKDIR/banner" anykernel/banner',
      ]))
 
 for label, old, new, count in edits:
