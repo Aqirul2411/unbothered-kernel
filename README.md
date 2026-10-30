@@ -194,7 +194,23 @@ public, keep the attribution.
 
 ## Result so far
 
-`own` build, run 41017537032, commit `16291d9`:
+Two builds passed verification against the config extracted from the phone.
+
+**`repro`, run 41020062047** — the pipeline reproduces the phone's kernel:
+
+```
+[verify] config: clean
+[verify] vermagic: 5.10.272-Arkael/8eab6f338 SMP preempt mod_unload modversions aarch64
+[verify] vermagic matches the phone's kernel exactly
+[verify] root block matches the phone's kernel (KernelSU-Next) exactly
+PASS - comparable to configs/marble-working.config
+```
+
+That is the first end-to-end proof this project has: the pinned tree, the pinned
+build system and the pinned driver produce a kernel byte-for-byte identical to
+the phone's in config, with the same vermagic, not just a similar one.
+
+**`own`, run 41017537032** — the deliverable:
 
 ```
 config.changed  =  2 lines, one pair:
@@ -210,9 +226,10 @@ So the shipped kernel differs from the one already booting on this phone in the
 name, and in the KernelSU-Next commit it was built against. That is the whole
 distance between "compiles" and "should boot".
 
-The bytes are not identical and should not be expected to be: build timestamp,
-build path and LTO ordering differ between any two machines. The config, the
-header and the module ABI are what decide a boot, and all three match.
+12,099,836 of 35,873,484 bytes differ, and that is expected rather than
+alarming: build timestamp, build path and LTO ordering differ between any two
+machines. The config, the header and the module ABI decide a boot, and all three
+match. What is still unproven is a boot, because the phone was not connected.
 
 ## Next
 
