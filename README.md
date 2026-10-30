@@ -192,6 +192,28 @@ Kernel source: GPL-2.0. This is a fork of work by **Arkael-Dev**
 (`arkael-kernel-a12-5.10`, `build-arkael`). Keep the licences, keep the source
 public, keep the attribution.
 
+## Result so far
+
+`own` build, run 41017537032, commit `16291d9`:
+
+```
+config.changed  =  2 lines, one pair:
+  -CONFIG_LOCALVERSION="-Arkael/8eab6f338"
+  +CONFIG_LOCALVERSION="-Unbothered/8eab6f338"
+config.significant.diff = 0 bytes
+vermagic        =  5.10.272-Unbothered/8eab6f338 SMP preempt mod_unload modversions aarch64
+image header    =  identical to the phone's Image (ARMd, text_offset 0,
+                   image_size 35651584, same flags, PE offset 64)
+```
+
+So the shipped kernel differs from the one already booting on this phone in the
+name, and in the KernelSU-Next commit it was built against. That is the whole
+distance between "compiles" and "should boot".
+
+The bytes are not identical and should not be expected to be: build timestamp,
+build path and LTO ordering differ between any two machines. The config, the
+header and the module ABI are what decide a boot, and all three match.
+
 ## Next
 
 - first `repro` run: confirm the config diff is empty, then flash it
