@@ -73,11 +73,16 @@ fi
 say "identity: $IDENTITY  (kernel name: $NAME, built by $KUSER@$KHOST)"
 
 # --- tuning ----------------------------------------------------------------
-# Only `own` gets the tuning fragment. `repro` exists to be byte-identical to the
-# phone's kernel, so it must not have opinions about zram or debug options: an
-# empty config diff is the whole point of it.
+# Only `own` gets the tuning fragment, and only when TUNING=on. `repro` exists to
+# be byte-identical to the phone's kernel, so it must not have opinions about
+# zram or debug options: an empty config diff is the whole point of it.
+#
+# TUNING=off builds the same commit with the tuning removed. That is the bisect
+# switch: when a tuned build fails to boot, one run with TUNING=off says whether
+# the setting or something else (the root driver) is responsible.
+TUNING="${TUNING:-on}"
 rm -f "$WORK/tuning.fragment"
-if [ "$IDENTITY" = "own" ]; then
+if [ "$IDENTITY" = "own" ] && [ "$TUNING" = "on" ]; then
   cp "$ROOT/configs/tuning.fragment" "$WORK/tuning.fragment"
   say "tuning: $(grep -cE '^(CONFIG_|# CONFIG_)' "$WORK/tuning.fragment") settings from configs/tuning.fragment"
 
@@ -85,6 +90,8 @@ if [ "$IDENTITY" = "own" ]; then
   # pinned AnyKernel3 draws Arkael's name in it. `repro` keeps Arkael's, because
   # repro is supposed to be indistinguishable from the phone's kernel.
   cp "$ROOT/assets/banner" "$WORK/banner"
+else
+  say "tuning: off (no config changes this build)"
 fi
 
 # --- edit the pinned build script ------------------------------------------

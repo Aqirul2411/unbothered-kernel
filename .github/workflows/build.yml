@@ -8,6 +8,11 @@ on:
         type: choice
         options: [repro, own]
         default: repro
+      tuning:
+        description: "on = apply configs/tuning.fragment; off = same commit without tuning (bisect switch)"
+        type: choice
+        options: [on, off]
+        default: on
   push:
     tags: ["v*"]
 
@@ -71,6 +76,7 @@ jobs:
       - name: Build
         env:
           IDENTITY: ${{ inputs.identity || 'own' }}
+          TUNING: ${{ inputs.tuning || 'on' }}
         run: ./scripts/10-build.sh
 
       - name: Collect
@@ -88,6 +94,7 @@ jobs:
           cp -rv work/verify artifacts/ 2>/dev/null || true
           {
             echo "identity=${{ inputs.identity || 'own' }}"
+            echo "tuning=${{ inputs.tuning || 'on' }}"
             echo "commit=${GITHUB_SHA}"
             echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
             echo "runner=$RUNNER_NAME"
