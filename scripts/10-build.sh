@@ -228,17 +228,27 @@ edit("tuning fragment",
          'make ${MAKE_ARGS[@]} $KERNEL_DEFCONFIG',
      ]))
 
-# the defconfig injection script, fetched from a moving branch by default.
+# the defconfig injection scripts, pulled from GitHub at build time by default.
 #    Three files: Inject_300hz.sh, gki_defconfig.sh (KVER 5.10) and
-#    gki-deconfig-6.1.sh. Only the second one runs at KVER=5.10, but leaving two
-#    of the three unpinned would be a pin that only mostly pins.
+#    gki-deconfig-6.1.sh.
+#
+#    These used to be repinned to BUILD_SHA, which was still a network fetch from
+#    build-arkael. When that repository was deleted the URLs 404'd and the build
+#    died at the 300Hz line. The files ship inside the vendored build system, so
+#    they are copied locally now and the network is out of it entirely.
+#
 #    Note the script tests for KSU=="SukiSU" while build.sh passes "sukisu", so
 #    the KSU_SUSFS branch runs. That is what Arkael's own build did, so the block
 #    we get is the block the phone runs: leave it exactly as it is.
-edit("inject_ksu ref",
-     "build-arkael/refs/heads/6.x/inject_ksu/",
-     "build-arkael/%s/inject_ksu/" % want("BUILD_SHA"),
-     count=3)
+edit("inject 300hz",
+     "wget -qO Inject_300hz.sh https://raw.githubusercontent.com/Arkael-Dev/build-arkael/refs/heads/6.x/inject_ksu/Inject_300hz.sh",
+     'cp "$WORKDIR/inject_ksu/Inject_300hz.sh" Inject_300hz.sh')
+edit("inject gki_defconfig",
+     "wget -qO inject.sh https://raw.githubusercontent.com/Arkael-Dev/build-arkael/refs/heads/6.x/inject_ksu/gki_defconfig.sh",
+     'cp "$WORKDIR/inject_ksu/gki_defconfig.sh" inject.sh')
+edit("inject gki-deconfig-6.1",
+     "wget -qO inject.sh https://raw.githubusercontent.com/Arkael-Dev/build-arkael/refs/heads/6.x/inject_ksu/gki-deconfig-6.1.sh",
+     'cp "$WORKDIR/inject_ksu/gki-deconfig-6.1.sh" inject.sh')
 
 # ReSukiSU: pin the setup script and the driver commit it checks out.
 #    setup.sh takes a commit as $1, so "bash -s -- <sha>" is all it needs.
