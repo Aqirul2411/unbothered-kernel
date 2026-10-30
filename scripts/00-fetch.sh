@@ -26,16 +26,27 @@ mkdir -p "$ROOT/src"
 # vendored in vendor/ as a git bundle, so the build no longer depends on a
 # third-party repository staying online. The network clone stays as a fallback
 # for the case where the bundle is missing.
-BUNDLE="$ROOT/vendor/build-arkael-$(printf '%s' "$BUILD_SHA" | cut -c1-7).bundle"
+#
+# The bundle is found by asking git, not by guessing a filename from the sha:
+# an earlier version of this script derived 7 characters from the pin while the
+# file was named with 8, and the build fell through to the dead URL.
+BUNDLE=""
+for b in "$ROOT"/vendor/build-arkael-*.bundle; do
+  [ -f "$b" ] || continue
+  if git bundle list-heads "$b" 2>/dev/null | grep -q "^$BUILD_SHA"; then
+    BUNDLE="$b"
+    break
+  fi
+done
 
 if [ ! -d "$ROOT/src/build-arkael/.git" ]; then
-  if [ -f "$BUNDLE" ]; then
+  if [ -n "$BUNDLE" ]; then
     say "using the vendored build system ($(basename "$BUNDLE"))"
     git clone -q "$BUNDLE" "$ROOT/src/build-arkael"
   else
-    say "no bundle at $BUNDLE, trying $BUILD_REPO"
+    say "no vendored bundle contains $BUILD_SHA, trying $BUILD_REPO"
     git clone -q "$BUILD_REPO" "$ROOT/src/build-arkael" \
-      || die "cannot obtain the build system: upstream is gone and no bundle exists"
+      || die "cannot obtain the build system: upstream is gone and no bundle has the pin"
   fi
 fi
 # A full clone on purpose: it is under 2 MB, and it means the pin can be any
