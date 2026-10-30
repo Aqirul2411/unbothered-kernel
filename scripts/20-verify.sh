@@ -15,8 +15,11 @@
 # Exit 0 = comparable, go ahead. Exit 1 = do not flash.
 #
 # Two references, both extracted from Images that boot on marble:
-#   marble-working.config   Arkael  5.10.272  ReSukiSU     + SUSFS  thin LTO
+#   marble-working.config   Arkael  5.10.272  KernelSU-Next + SUSFS  thin LTO
 #   templar-working.config  Templar 5.10.271  KernelSU-Next + SUSFS  full LTO
+#
+# marble is the phone's own kernel, so it is the primary reference: matching it
+# means matching what the device is running.
 
 set -euo pipefail
 
@@ -150,35 +153,39 @@ else
 fi
 
 # --- 4. is our root block one we know boots? ------------------------------
-# Arkael ships ReSukiSU, Templar ships KernelSU-Next. Both boot on this phone,
-# so a KSU symbol set that matches neither is a symbol set nobody has booted.
+# Both references are KernelSU-Next, and the phone's own config is the primary
+# one: matching it means matching the kernel this device is running right now.
+# Templar is the second booting sample, there to catch a block that matches
+# neither.
+ksu_block() { grep -E '^CONFIG_(KSU|KPM)' "$1" | sort; }
+
 same_ksu_block() {
-  local a="$1" b="$2"
-  diff -q <(grep -E '^CONFIG_(KSU|KPM)' "$a" | sort) \
-          <(grep -E '^CONFIG_(KSU|KPM)' "$b" | sort) >/dev/null
+  diff -q <(ksu_block "$1") <(ksu_block "$2") >/dev/null
 }
 
 case "$IDENTITY:$KSU" in
   repro:*)
     same_ksu_block "$OUT/built.config" "$REF" \
-      || die "CONFIG_KSU block differs from $(basename "$REF"); repro must match Arkael exactly"
-    say "root block matches Arkael (ReSukiSU) exactly"
+      || die "CONFIG_KSU block differs from $(basename "$REF"); repro must match the phone exactly"
+    say "root block matches the phone's kernel (KernelSU-Next) exactly"
     ;;
   own:yes)
-    KREF="$ROOT/configs/$KSU_REF_CONFIG"
-    if [ -f "$KREF" ]; then
-      diff -u <(grep -E '^CONFIG_(KSU|KPM)' "$KREF" | sort) \
-              <(grep -E '^CONFIG_(KSU|KPM)' "$OUT/built.config" | sort) \
-        > "$OUT/ksu.diff" || true
-      if [ -s "$OUT/ksu.diff" ]; then
-        warn "root block is not identical to $(basename "$KREF") (KernelSU-Next, boots):"
-        sed -n '1,40p' "$OUT/ksu.diff" | sed 's/^/    /'
-        warn "not fatal: KernelSU-Next moves too, and our tree is Arkael's."
-        warn "read $OUT/ksu.diff before flashing; a missing CONFIG_KSU_SUSFS is a red flag."
+    for refname in "$KSU_REF_CONFIG" "$KSU_REF_CONFIG_2"; do
+      [ -n "$refname" ] || continue
+      KREF="$ROOT/configs/$refname"
+      [ -f "$KREF" ] || continue
+      diff -u <(ksu_block "$KREF") <(ksu_block "$OUT/built.config") \
+        > "$OUT/ksu-$refname.diff" || true
+      if [ -s "$OUT/ksu-$refname.diff" ]; then
+        warn "root block differs from $refname:"
+        sed -n '1,40p' "$OUT/ksu-$refname.diff" | sed 's/^/    /'
       else
-        say "root block matches Templar (KernelSU-Next), the other kernel that boots here"
+        say "root block matches $refname exactly"
       fi
-    fi
+    done
+    # Informational, not fatal: own tracks the KernelSU-Next tip on purpose, so a
+    # new upstream symbol shows up here first. What would be a red flag is
+    # CONFIG_KSU_SUSFS going missing, and step 3 already fails on that.
     ;;
 esac
 

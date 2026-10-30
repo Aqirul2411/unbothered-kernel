@@ -59,15 +59,15 @@ case "$IDENTITY" in
 esac
 
 # Root flavour is fixed per identity, because it is part of what verify proves.
-if [ "$IDENTITY" = "repro" ] && [ "$KSU" != "sukisu" ]; then
-  die "IDENTITY=repro must use KSU=sukisu (Arkael's ReSukiSU), got KSU=$KSU.
-  A different root flavour changes the CONFIG_KSU_* block, so the repro config
-  diff against configs/marble-working.config would stop proving anything.
-  Use IDENTITY=own for KernelSU-Next."
-fi
-if [ "$IDENTITY" = "own" ] && [ "$KSU" = "sukisu" ]; then
-  die "IDENTITY=own is KernelSU-Next (KSU=yes). ReSukiSU only exists to reproduce
-  the phone's current kernel: use IDENTITY=repro for it."
+# Both identities use KernelSU-Next: that is what the phone runs (see
+# configs/identity.env for the config evidence), so reproducing it and shipping
+# our own are the same root stack.
+if [ "$KSU" != "yes" ]; then
+  die "IDENTITY=$IDENTITY expects KSU=yes (KernelSU-Next), got KSU=$KSU.
+  The phone runs KernelSU-Next: its config carries CONFIG_KSU_SAMSUNG_KDP/RKP/
+  DEFEX, CONTAINER_COMPAT and THRONE_TRACKER, and none of BakaSU's options.
+  A different root flavour changes the CONFIG_KSU_* block, so the config diff
+  would stop proving that we built the kernel the phone already boots."
 fi
 
 say "identity: $IDENTITY  (kernel name: $NAME, built by $KUSER@$KHOST)"

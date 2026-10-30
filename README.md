@@ -25,7 +25,7 @@ used as brackets rather than guesses:
 
 | | version | root | LTO | config |
 |---|---|---|---|---|
-| Arkael (the tree we build) | 5.10.272 | ReSukiSU + SUSFS | thin | `configs/marble-working.config` |
+| Arkael (the tree we build) | 5.10.272 | KernelSU-Next + SUSFS | thin | `configs/marble-working.config` |
 | Templar (second opinion) | 5.10.271 | KernelSU-Next + SUSFS | full | `configs/templar-working.config` |
 
 They only differ on 229 config lines, and those differences are taste and

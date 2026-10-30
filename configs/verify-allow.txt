@@ -12,11 +12,13 @@
 # The rename. This is the whole point of `own`.
 ^(# )?CONFIG_LOCALVERSION=
 
-# ReSukiSU -> KernelSU-Next. Different implementations, different symbols:
-# Arkael carries CONFIG_KSU_SAMSUNG_KDP/RKP/DEFEX and NO_PATCH_TEXT, KernelSU-Next
-# carries its own KSU_* set. This is the one change in `own` that is not just a
-# rename, and the Templar image proves the stack boots on this phone.
-# `(# )?` because a disabled option appears as "# CONFIG_x is not set", and a
-# root stack that dropped one of those is exactly the kind of change we allow.
+# The root driver. `own` tracks the KernelSU-Next tip on purpose, while both
+# references were built at earlier points, so new CONFIG_KSU_* symbols appear
+# here first. `(# )?` because a disabled option appears as "# CONFIG_x is not
+# set", and a driver that dropped an option is exactly the kind of change this
+# has to tolerate without hiding it: every accepted line is printed.
+#
+# Not covered, on purpose: CONFIG_KSU=y and CONFIG_KSU_SUSFS=y are checked
+# separately, and losing either fails the build.
 ^(# )?CONFIG_KSU
 ^(# )?CONFIG_KPM
