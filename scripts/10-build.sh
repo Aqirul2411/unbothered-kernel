@@ -10,11 +10,12 @@
 # What is changed, and why:
 #   1. kernel name / builder / host        -> identity
 #   2. kernel clone                        -> check out KERNEL_SHA, not a branch tip
-#   3. inject_ksu script                   -> pinned to BUILD_SHA, not branch 6.x
-#   4. ReSukiSU setup + driver             -> pinned shas, not branch main
-#   5. susfs4ksu clone                     -> pinned sha
-#   6. KPM Image patch                     -> pinned sha
-#   7. AnyKernel3 clone                    -> pinned sha
+#   3. localversion suffix                 -> KERNEL_SHORT_SHA, not git's choice
+#   4. inject_ksu scripts                  -> pinned to BUILD_SHA, not branch 6.x
+#   5. ReSukiSU setup + driver             -> pinned shas, not branch main
+#   6. susfs4ksu clone                     -> pinned sha
+#   7. KPM Image patch                     -> pinned sha
+#   8. AnyKernel3 clone                    -> pinned sha
 #
 # Outputs:
 #   work/out/arch/arm64/boot/Image
@@ -74,7 +75,7 @@ say "identity: $IDENTITY  (kernel name: $NAME, built by $KUSER@$KHOST)"
 # count assertion, so a moved line is a one-line error message instead of an
 # edit that silently did nothing.
 export NAME KUSER KHOST
-export KERNEL_REPO KERNEL_BRANCH KERNEL_SHA KERNEL_CLONE_DEPTH
+export KERNEL_REPO KERNEL_BRANCH KERNEL_SHA KERNEL_CLONE_DEPTH KERNEL_SHORT_SHA
 export BUILD_SHA BAKASU_SETUP_SHA BAKASU_DRIVER_SHA
 export SUSFS_SHA SUSFS_CLONE_DEPTH SUKISU_PATCH_SHA ANYKERNEL_SHA
 
@@ -122,7 +123,17 @@ edit("kernel clone",
          '[ "$(git -C $KSRC rev-parse HEAD)" = "%s" ]' % sha,
      ]))
 
-# 3. the defconfig injection script, fetched from a moving branch by default.
+# 3. the localversion suffix. build.sh asks git for a short hash and lets git
+#    choose how short: it derives the length from the repository's object count,
+#    so the same commit prints as 7 or 9 hex digits depending on how it was
+#    cloned -- and that lands in CONFIG_LOCALVERSION and therefore in vermagic.
+#    Both identities want the same 9 digits the working kernel carries, so the
+#    value is pinned instead of derived.
+edit("localversion suffix",
+     "LATEST_COMMIT_HASH=$(git rev-parse --short HEAD)",
+     "LATEST_COMMIT_HASH=%s" % want("KERNEL_SHORT_SHA"))
+
+# 4. the defconfig injection script, fetched from a moving branch by default.
 #    Three files: Inject_300hz.sh, gki_defconfig.sh (KVER 5.10) and
 #    gki-deconfig-6.1.sh. Only the second one runs at KVER=5.10, but leaving two
 #    of the three unpinned would be a pin that only mostly pins.
@@ -134,14 +145,14 @@ edit("inject_ksu ref",
      "build-arkael/%s/inject_ksu/" % want("BUILD_SHA"),
      count=3)
 
-# 4. ReSukiSU: pin the setup script and the driver commit it checks out.
+# 5. ReSukiSU: pin the setup script and the driver commit it checks out.
 #    setup.sh takes a commit as $1, so "bash -s -- <sha>" is all it needs.
 edit("bakasu setup",
      'curl -LSs "https://raw.githubusercontent.com/Arkael-Dev/BakaSU/refs/heads/main/kernel/setup.sh" | bash',
      'curl -LSs "https://raw.githubusercontent.com/Arkael-Dev/BakaSU/%s/kernel/setup.sh" | bash -s -- %s'
      % (want("BAKASU_SETUP_SHA"), want("BAKASU_DRIVER_SHA")))
 
-# 5. SUSFS: both clone spellings in the script (quoted for susfs_included,
+# 6. SUSFS: both clone spellings in the script (quoted for susfs_included,
 #    unquoted for the standard path used by KSU=yes).
 susfs_sha = want("SUSFS_SHA")
 susfs_depth = want("SUSFS_CLONE_DEPTH")
@@ -160,12 +171,12 @@ edit("susfs clone (unquoted)",
          "git -C $SUSFS_DIR checkout -q %s" % susfs_sha,
      ]))
 
-# 6. the binary KPM patch applied to the finished Image
+# 7. the binary KPM patch applied to the finished Image
 edit("kpm patch",
      "SukiSU_patch/raw/refs/heads/main/kpm/patch_linux",
      "SukiSU_patch/raw/%s/kpm/patch_linux" % want("SUKISU_PATCH_SHA"))
 
-# 7. AnyKernel3 packaging
+# 8. AnyKernel3 packaging
 edit("anykernel clone",
      "git clone -q --depth=1 $ANYKERNEL_REPO -b $ANYKERNEL_BRANCH anykernel",
      "\n".join([
