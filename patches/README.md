@@ -5,42 +5,53 @@ checked out and before anything is configured.
 
 ## How it works
 
-- Every `*.patch` in this directory is applied in filename order, `patch -p1
-  --forward --fuzz=2`.
-- Any `.rej` file afterwards fails the build and lists the files. A half-merged
+- Every `*.patch` in **this directory** (not in subdirectories) is applied in
+  filename order, `patch -p1 --forward --fuzz=2`.
+- Any `.rej` afterwards fails the build and lists the files. A half-merged
   kernel must never reach the compiler quietly.
 - Applied to `IDENTITY=own` only. `repro` stays an exact copy of the phone's
   tree, which is the whole point of it.
-- `kernel.org` incremental patches carry `index` lines, but those blob ids are
-  upstream 5.10.272 and do not exist in this tree, so `git apply --3way` has
-  nothing to merge against. `patch` with fuzz is the honest tool here.
+- Files under `experimental/` are **not** applied. They are kept for the record
+  and to stop someone re-deriving the same conclusion.
 
 ## Why this exists
 
 Before this directory had anything in it, the kernel was Arkael's tree plus a
-name. Keeping stable updates here — rather than forking the tree — means every
-change to the source is a file with a header explaining it, and reverting one is
+name. Keeping changes here — rather than forking the tree — means every change
+to the source is a file with a header explaining it, and reverting one is
 deleting a file.
 
-## What is in here
+## experimental/stable-5.10.273-vanilla.patch — rejected
 
-### `0001-stable-5.10.273.patch`
-
-Upstream stable update, 5.10.272 → 5.10.273, from
+Upstream stable update 5.10.272 → 5.10.273, from
 `https://cdn.kernel.org/pub/linux/kernel/v5.x/incr/patch-5.10.272-273.xz`
 (sha256 of the .xz: `efeded3814b6db9682846e2fda622305518ef5178f9653a1d1d1bf5dfd5f9646`).
 
-494 files: drivers/gpu, drivers/usb, drivers/net, fs/xfs, fs/cifs, net/ipv4,
-sound, and the usual scattering of stable fixes.
-
-**Known conflict risk:** this tree carries Arkael's BBRv3 backport, which rewrote
-much of `net/ipv4/tcp_*.c`. The stable update touches `net/ipv4/tcp_input.c`.
-If it applies with fuzz, the merged result needs reading, not just trusting —
-a silently fuzzed hunk inside TCP congestion control is exactly the kind of
-thing that behaves fine until the network is under load.
-
-**Verification after it lands:**
+**Result: 477 of 494 files applied, 17 rejected.**
 
 ```
-cat /proc/version        -> 5.10.273-Unbothered/...
+include/net/net_namespace.h      include/linux/property.h
+include/linux/fsnotify_backend.h arch/arm64/include/asm/cpucaps.h
+arch/arm64/mm/fault.c            fs/nfsd/nfs4proc.c
+fs/f2fs/{super,file,gc}.c        fs/f2fs/gc.h
+net/core/{filter,net_namespace}.c
+net/bluetooth/hci_core.c         drivers/base/property.c
+drivers/usb/typec/tcpm/tcpm.c    mm/mmap.c
+kernel/time/tick-broadcast.c
 ```
+
+**Why it fails, and why it is not a fuzz problem:** this kernel is
+**AOSP `android12-5.10`**, not vanilla `linux-5.10.x`. Those 17 files are where
+Android carries its own changes. Kernel.org's stable patch is written against
+upstream code that this tree does not have, so no amount of `--fuzz` will merge
+them correctly.
+
+**The correct route, if a newer stable is ever wanted:** re-base onto a newer
+commit of Google's `android12-5.10` branch, which takes the stable merges
+itself. That is a tree-level operation, not a patch, and it is a multi-day job
+with a full re-verification.
+
+**Do not hand-merge the 17 rejects.** They sit in arm64 fault handling, f2fs,
+net core and the timer broadcast path: exactly the places where a subtle
+mismatch shows up minutes or days later, on a phone that is somebody's daily
+driver.
