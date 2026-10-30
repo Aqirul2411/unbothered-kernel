@@ -42,6 +42,26 @@ CONFIG_HZ=250
 # CONFIG_HZ_300 is not set
 
 # ---------------------------------------------------------------------------
+# 3. DAMON: give the kernel the ability to monitor user address spaces.
+#
+# DAMON (Data Access Monitoring, mainline 5.15) is already backported into this
+# tree by Google: CONFIG_DAMON, DAMON_PADDR and DAMON_RECLAIM are built. What is
+# missing is DAMON_VADDR - the half that can watch *user* memory - and
+# DAMON_DBGFS, the interface needed to configure it.
+#
+# Why this and not MGLRU: DAMON does not replace the LRU. It samples access
+# patterns and lets a policy (DAMON_RECLAIM) reclaim pages that are provably
+# cold. MGLRU rewrites reclaim and hung this phone; this only watches.
+#
+# These two symbols change no behaviour on their own. Nothing is monitored until
+# a policy is configured, and configuring it needs debugfs, which needs root.
+# That is deliberate: the capability ships now, the experiment happens when we
+# can actually read the result.
+# ---------------------------------------------------------------------------
+CONFIG_DAMON_VADDR=y
+CONFIG_DAMON_DBGFS=y
+
+# ---------------------------------------------------------------------------
 # REVERTED, do not add back: CONFIG_KASAN off.
 #
 # Reason: the build with KASAN off **hangs this phone at the POCO logo**, with no
