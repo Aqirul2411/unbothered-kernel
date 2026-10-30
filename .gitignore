@@ -1,0 +1,16 @@
+# pinned sources and build scratch space
+src/
+work/
+
+# build outputs
+out/
+*.zip
+*.log
+*.img
+Image
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

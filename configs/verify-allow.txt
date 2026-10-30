@@ -1,0 +1,22 @@
+# Config differences we deliberately accept, for IDENTITY=own only.
+#
+# One extended regex per line, matched against a config line with its leading
+# "-" or "+" removed. Blank lines and lines starting with # are ignored.
+#
+# Rule: a line goes in here only when we know why it changed and we changed it
+# on purpose. Everything not listed here fails the build.
+#
+# The repro identity does not read this file at all: a reproduction has to diff
+# clean, no exceptions.
+
+# The rename. This is the whole point of `own`.
+^(# )?CONFIG_LOCALVERSION=
+
+# ReSukiSU -> KernelSU-Next. Different implementations, different symbols:
+# Arkael carries CONFIG_KSU_SAMSUNG_KDP/RKP/DEFEX and NO_PATCH_TEXT, KernelSU-Next
+# carries its own KSU_* set. This is the one change in `own` that is not just a
+# rename, and the Templar image proves the stack boots on this phone.
+# `(# )?` because a disabled option appears as "# CONFIG_x is not set", and a
+# root stack that dropped one of those is exactly the kind of change we allow.
+^(# )?CONFIG_KSU
+^(# )?CONFIG_KPM

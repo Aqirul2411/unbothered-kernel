@@ -1,0 +1,90 @@
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      identity:
+        description: "repro = build as Arkael and match the phone; own = build as Unbothered"
+        type: choice
+        options: [repro, own]
+        default: repro
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      # A 5.10 kernel with thin LTO needs well over the runner's default free
+      # space. Drop the preinstalled toolchains we do not use.
+      - name: Free disk space
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /opt/hostedtoolcache/CodeQL /usr/local/share/boost \
+                      "${AGENT_TOOLSDIRECTORY:-/opt/hostedtoolcache}" || true
+          sudo docker image prune -a -f || true
+          df -h /
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc bison flex libssl-dev libelf-dev \
+            rsync zip unzip p7zip-full zstd xz-utils cpio kmod \
+            device-tree-compiler python3 git curl wget patch ca-certificates
+          sudo timedatectl set-timezone Asia/Jakarta || true
+
+      # No toolchain cache on purpose: the pinned build script always downloads
+      # and unpacks clang itself, and a restored work/clang would also make the
+      # "work/ is empty, clone the build system into it" step fail. Caching it
+      # would mean patching the pinned script to skip a download, which is a
+      # change to the build for a two-minute saving.
+
+      # Cheap and first: a typo in a shell script should fail in five seconds,
+      # not twenty minutes into a kernel build. This also catches an
+      # unterminated heredoc, which is the one way the embedded python patcher
+      # can break without a python error.
+      - name: Syntax check
+        run: |
+          chmod +x scripts/*.sh
+          for f in scripts/*.sh; do bash -n "$f" || exit 1; done
+          python3 -c "print('python3 ok')"
+
+      - name: Fetch pinned sources
+        run: ./scripts/00-fetch.sh
+
+      - name: Build
+        env:
+          IDENTITY: ${{ inputs.identity || 'own' }}
+        run: ./scripts/10-build.sh
+
+      - name: Collect
+        if: always()
+        run: |
+          mkdir -p artifacts
+          cp -v work/out/arch/arm64/boot/Image artifacts/ 2>/dev/null || true
+          cp -v work/*.zip artifacts/ 2>/dev/null || true
+          cp -v work/build.log artifacts/ 2>/dev/null || true
+          cp -rv work/verify artifacts/ 2>/dev/null || true
+          {
+            echo "identity=${{ inputs.identity || 'own' }}"
+            echo "commit=${GITHUB_SHA}"
+            echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "runner=$RUNNER_NAME"
+          } > artifacts/BUILD_INFO.txt
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unbothered-${{ inputs.identity || 'own' }}-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 30

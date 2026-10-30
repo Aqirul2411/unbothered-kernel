@@ -1,0 +1,15 @@
+# Everything here is consumed on Linux: a CRLF in a .sh file makes bash fail
+# with "$'\r': command not found", and a CRLF in a .config file would show up as
+# a difference in every single line of the verify diff.
+* text=auto eol=lf
+
+*.sh    text eol=lf
+*.yml   text eol=lf
+*.env   text eol=lf
+*.config text eol=lf
+*.txt   text eol=lf
+
+# Windows-only helper scripts, if they are ever added.
+*.ps1   text eol=crlf
+*.cmd   text eol=crlf
+*.bat   text eol=crlf
