@@ -94,6 +94,10 @@ if [ "$IDENTITY" = "own" ]; then
   # Branding is not tuning: a build with the config tuning switched off is still
   # an Unbothered build, and its installer should say so.
   cp "$ROOT/assets/banner" "$WORK/banner"
+  # And the installer script itself: the pinned one injects Arkael's vortex.sh
+  # into the ramdisk, which disables thermals and forces the performance
+  # governor. Ours installs the kernel and nothing else.
+  cp "$ROOT/assets/anykernel.sh" "$WORK/anykernel.sh"
 fi
 if [ "$IDENTITY" = "own" ] && [ "$TUNING" != "off" ]; then
   case "$TUNING" in
@@ -271,6 +275,9 @@ edit("anykernel clone",
          # The install-time banner is text, printed by AK3's update-binary.
          # Only present for `own`; see the copy step earlier in this script.
          '[ -f "$WORKDIR/banner" ] && cp -f "$WORKDIR/banner" anykernel/banner',
+         # Same for the install script: ours takes the kernel and leaves the
+         # ramdisk alone. See assets/anykernel.sh for what was removed and why.
+         '[ -f "$WORKDIR/anykernel.sh" ] && cp -f "$WORKDIR/anykernel.sh" anykernel/anykernel.sh',
      ]))
 
 for label, old, new, count in edits:
