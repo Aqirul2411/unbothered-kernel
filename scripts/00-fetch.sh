@@ -65,7 +65,16 @@ say "build-arkael  $(git -C "$ROOT/src/build-arkael" log -1 --format='%h %s')"
 # and the build does that anyway. What we can do is print the tip, so the log
 # says how far the branch has moved past the pin.
 TIP="$(git ls-remote --heads "$KERNEL_REPO" "refs/heads/$KERNEL_BRANCH" | cut -f1)"
-[ -n "$TIP" ] || die "cannot reach $KERNEL_REPO (refs/heads/$KERNEL_BRANCH)"
+if [ -z "$TIP" ]; then
+  # This has happened twice: the branch is renamed and the pin silently stops
+  # resolving. Say what is actually there instead of "cannot reach".
+  echo "ERROR: $KERNEL_REPO has no branch '$KERNEL_BRANCH'." >&2
+  echo "ERROR: branches that do exist:" >&2
+  git ls-remote --heads "$KERNEL_REPO" | awk '{print "  " $2}' >&2 || true
+  echo "ERROR: if the pin was renamed, update KERNEL_BRANCH in configs/pins.env" >&2
+  echo "ERROR: and confirm KERNEL_SHA is still an ancestor of the new branch." >&2
+  exit 1
+fi
 say "kernel        $KERNEL_BRANCH tip is ${TIP:0:9}, pinning ${KERNEL_SHA:0:9}"
 
 if [ "$TIP" = "$KERNEL_SHA" ]; then
