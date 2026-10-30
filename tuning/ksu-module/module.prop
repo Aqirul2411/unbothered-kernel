@@ -1,0 +1,6 @@
+id=unbothered-tune
+name=Unbothered memory tuning
+version=1.0
+versionCode=1
+author=Aqirul2411
+description=Turns zram on if init did not, then applies three vm tunables that only make sense with compressed swap. Disable in the manager to undo everything; nothing here survives a reboot except the tuned values, and those revert when the module is off.
