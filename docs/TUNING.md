@@ -70,21 +70,39 @@ the script that generates it.
 
 ---
 
-## Accepted
+## Batches
 
-### Batch 1 — stop paying for debug instrumentation
+### Batch 1 - KASAN off: REVERTED, it hangs this phone
 
 Applied only to `IDENTITY=own`, via `configs/tuning.fragment`.
 
-| change | reason |
+**Result on the device: stuck at the POCO logo.** No adb, and the key combo did
+not reach recovery; recovered with `fastboot boot melt.img` and reinstalling the
+previous kernel. Nothing was lost - `boot` was the only partition touched.
+
+**How we know it was KASAN and not the moved driver.** Batch 1 changed two things
+at once, so a build was made with the *same new driver* and the phone's original
+config (`TUNING=off`). It **boots**. Same driver, no hang. That leaves the config,
+and inside the config only KASAN can affect runtime - `DEBUG_INFO` never appears
+in the Image at all. The sizes agree: 35,873,484 bytes with KASAN, 35,805,516
+without.
+
+There is no explanation yet for *why*, and a hang leaves no log to test guesses
+against. The empirical fact is enough to stop.
+
+| change | verdict |
 |---|---|
-| `CONFIG_KASAN` off (and `KASAN_HW_TAGS` with it) | memory tagging in a daily driver: CPU on every allocation, memory for tags. A fuzzing tool, not a runtime feature. |
-| `CONFIG_DEBUG_INFO` off | ~1 GB of `vmlinux` that never reaches the phone. Build time and artifact size only. |
+| `CONFIG_KASAN` off | **reverted.** Hangs at the logo on this phone. A theoretical benefit on an unbootable kernel is zero. |
+| `CONFIG_DEBUG_INFO` off | kept. ~1 GB of vmlinux that never reaches the phone; build time and artifact size only. |
 
 Untouched on purpose: CFI, PAC, BTI, hardened usercopy, stack protector (security
 that is worth its cost), `CONFIG_FTRACE` (perfetto/System Tracing uses tracefs),
 `CONFIG_KALLSYMS_ALL` (SUSFS and KernelSU-Next resolve symbols through it).
 
+**Lesson about method, not kernels:** batch 1 moved the config *and* the driver in
+one flash. That turned a five-minute bisect into an hour and a phone that would
+not boot. One change per flash is the difference between a symptom and a
+diagnosis. The `TUNING` switch exists so the next question costs one dispatch.
 ### Dropped from batch 1 — zram
 
 The first attempt also enabled `CONFIG_ZRAM`, `CONFIG_ZSMALLOC` and
@@ -111,14 +129,6 @@ into the kernel, not what the phone actually has. Vendor modules are invisible
 to it, and "the config has no zram" is not the same sentence as "the phone has
 no swap".
 
-### Batch 1 — device result
-
-**Built and verified** (run 41026583256): config diff is exactly KASAN off,
-DEBUG_INFO off and their side effects; `ksu-marble-working.config.diff` is 0
-bytes, i.e. the root stack still matches the phone exactly.
-
-_Pending flash._ Batch 0 is the one currently on the phone and known to boot
-twice; it is kept as `unbothered-batch0-boots.zip` in the handover folder.
 
 ---
 

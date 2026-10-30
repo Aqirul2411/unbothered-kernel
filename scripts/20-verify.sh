@@ -86,8 +86,12 @@ if [ "$IDENTITY" = "own" ]; then
 
   TUNING="$ROOT/configs/tuning.fragment"
   if [ -f "$TUNING" ]; then
-    TUNE_RE="$(grep -oE 'CONFIG_[A-Z0-9_]+' "$TUNING" | sort -u | sed 's/^/^(# )?/' | paste -sd'|' - || true)"
-    TUNED_COUNT=$(grep -oE 'CONFIG_[A-Z0-9_]+' "$TUNING" | sort -u | wc -l | tr -d ' ')
+    # Only real settings count: CONFIG_X=... or "# CONFIG_X is not set". The file
+    # is full of prose that names symbols (the reverted KASAN entry, for one) and
+    # mentioning a symbol must never widen what verification forgives.
+    TUNE_SYMS="$(grep -E '^(CONFIG_[A-Z0-9_]+=|# CONFIG_[A-Z0-9_]+ is not set)' "$TUNING" | grep -oE 'CONFIG_[A-Z0-9_]+' | sort -u || true)"
+    TUNE_RE="$(printf '%s\n' "$TUNE_SYMS" | sed '/^$/d; s/^/^(# )?/' | paste -sd'|' - || true)"
+    TUNED_COUNT=$(printf '%s\n' "$TUNE_SYMS" | sed '/^$/d' | wc -l | tr -d ' ')
     if [ -n "$TUNE_RE" ]; then
       if [ -n "$ALLOW_RE" ]; then
         ALLOW_RE="$ALLOW_RE|$TUNE_RE"

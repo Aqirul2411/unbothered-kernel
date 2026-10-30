@@ -1,4 +1,4 @@
-# Tuning applied to IDENTITY=own only.
+# Tuning applied to IDENTITY=own.
 #
 # Appended to arch/arm64/configs/gki_defconfig right before the build generates
 # its .config, so these are the last word on each symbol. NOT applied to `repro`,
@@ -9,53 +9,35 @@
 # outside this list still fails the build.
 #
 # One entry per reason. If a knob cannot say why it is here, it does not belong.
-# A knob whose premise turned out to be wrong gets deleted, not kept "just in
-# case" -- see zram below.
 
 # ---------------------------------------------------------------------------
-# 1. KernelAddressSanitizer is off.
-#
-# The phone's config has CONFIG_KASAN=y with CONFIG_KASAN_HW_TAGS=y, i.e. memory
-# tagging instrumentation active in a daily driver. It is a debugging feature:
-# CPU cost on every allocation, memory cost for tags and redzones, and it buys
-# nothing on a phone that is not being fuzzed.
-#
-# This does not touch CFI, pointer authentication or BTI: those stay.
-# ---------------------------------------------------------------------------
-# CONFIG_KASAN is not set
-
-# ---------------------------------------------------------------------------
-# 2. Debug symbols are not built.
+# 1. Debug symbols are not built.
 #
 # CONFIG_DEBUG_INFO with DWARF4 is ~1 GB of vmlinux nobody ships. It does not
-# change the Image at all, only build time and artifact size. Turning it off is
-# free.
+# change the Image at all - build time and artifact size only. This is the one
+# change in this file that cannot affect how the phone runs, which is exactly
+# why it survived the batch 1 failure.
 #
 # The two lines after it are not settings: they are the symbols that stop
-# existing once DEBUG_INFO is off. They are listed so this file is a complete
-# record of what the build changes. "The config dropped an option because its
-# parent went away" is still a change.
+# existing once DEBUG_INFO is off. They are listed so this file stays a complete
+# record of what the build changes.
 # ---------------------------------------------------------------------------
 # CONFIG_DEBUG_INFO is not set
 # CONFIG_GDB_SCRIPTS is not set
 # CONFIG_DEBUG_EFI is not set
 
 # ---------------------------------------------------------------------------
-# Removed: zram.
+# REVERTED, do not add back: CONFIG_KASAN off.
 #
-# The first version of this file enabled CONFIG_ZRAM, CONFIG_ZSMALLOC and
-# CONFIG_CRYPTO_LZO on the theory that the kernel had no swap, so Android was
-# killing apps instead of compressing cold pages.
+# Reason: the build with KASAN off **hangs this phone at the POCO logo**, with no
+# adb and no log. Proven by bisection - the same KernelSU-Next driver with the
+# phone's original config boots fine, so the sanitizer removal was the cause.
+# Image size difference confirms it: 35,873,484 bytes with KASAN, 35,805,516
+# without, while DEBUG_INFO changes nothing in the Image.
 #
-# That theory was wrong, and the device said so:
+# Whatever the theoretical cost of running KASAN on this hardware, an unbootable
+# kernel costs more. If it is ever revisited, it needs a device-side log (serial
+# or last_kmsg) to explain the hang first - not another flash.
 #
-#   zram0 already in use: 8388604 kB   SwapTotal: 8388604 kB
-#   algorithms: lzo [lzo-rle] lz4 zstd
-#
-# Your ROM already brings zram up with 8 GB and lzo-rle. The kernel config does
-# not show it because the ROM loads zram as a vendor module from vendor_dlkm, and
-# built-in config cannot see vendor modules at all.
-#
-# Enabling it here as well would duplicate a driver the vendor also loads, for
-# exactly zero benefit. Deleted.
+#   # CONFIG_KASAN is not set
 # ---------------------------------------------------------------------------
