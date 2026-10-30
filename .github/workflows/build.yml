@@ -17,10 +17,14 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Pinned, not latest. `ubuntu-latest` moves to Ubuntu 26 in October 2026, and
+    # a 5.10 tree built with a much newer host gcc is exactly the kind of change
+    # that shows up as a config or build difference nobody asked for. Bump this
+    # deliberately, with a build to compare against.
+    runs-on: ubuntu-24.04
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # A 5.10 kernel with thin LTO needs well over the runner's default free
       # space. Drop the preinstalled toolchains we do not use.
@@ -81,7 +85,7 @@ jobs:
             echo "runner=$RUNNER_NAME"
           } > artifacts/BUILD_INFO.txt
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: unbothered-${{ inputs.identity || 'own' }}-${{ github.run_number }}
