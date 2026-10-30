@@ -27,6 +27,21 @@
 # CONFIG_DEBUG_EFI is not set
 
 # ---------------------------------------------------------------------------
+# 2. Timer frequency: 250 Hz instead of 300.
+#
+# The tree gets 300 from Arkael's inject_ksu script. Both kernels we analysed
+# chose 250: SilverCore (vendor tree, 2023) and GrayRavens (same GKI base, 2026).
+# 250 is 17% fewer timer interrupts per second, which is a real idle cost - the
+# scheduler, RCU and timekeeping all run on that tick.
+#
+# It is also the only runtime change in this file, which is the point: one
+# change per flash, so the next measurement has one explanation.
+# ---------------------------------------------------------------------------
+CONFIG_HZ_250=y
+CONFIG_HZ=250
+# CONFIG_HZ_300 is not set
+
+# ---------------------------------------------------------------------------
 # REVERTED, do not add back: CONFIG_KASAN off.
 #
 # Reason: the build with KASAN off **hangs this phone at the POCO logo**, with no
