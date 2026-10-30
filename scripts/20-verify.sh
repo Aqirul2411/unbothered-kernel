@@ -107,7 +107,14 @@ fi
 say "config: clean"
 
 # --- 2. vermagic -----------------------------------------------------------
-BUILT_VERMAGIC=$(strings -n 10 "$IMAGE" | grep -m1 ' SMP preempt mod_unload .* aarch64$' || true)
+# -oE instead of a whole line: the vermagic is the only
+# "<version>-<localversion> SMP preempt mod_unload ... aarch64" string in the
+# image, but what precedes it in the binary is a layout detail of the linker,
+# not something to fail a build over. What matters is the string itself, and
+# that is still compared exactly.
+BUILT_VERMAGIC=$(strings -n 10 "$IMAGE" \
+  | grep -m1 -oE '[0-9]+\.[0-9]+\.[0-9]+-[^ ]+ SMP preempt mod_unload [a-zA-Z0-9_ ]*aarch64' \
+  || true)
 [ -n "$BUILT_VERMAGIC" ] || die "cannot find a vermagic string in the image"
 say "vermagic: $BUILT_VERMAGIC"
 
