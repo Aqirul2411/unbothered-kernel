@@ -83,23 +83,30 @@ in this run.
 
 ## Identity: `repro` vs `own`
 
-Two things are baked into the build identity: the kernel name and the root
-flavour. The name is part of `CONFIG_LOCALVERSION`, which is part of
-**vermagic**, so reproducing the phone's kernel and naming it `Unbothered` are
-mutually exclusive. The root flavour has to follow, because ReSukiSU and
-KernelSU-Next produce different `CONFIG_KSU_*` blocks — and a config diff is
-only meaningful if the root stack was the same.
+Both identities build the same tree with the same root stack. The only thing
+that changes between them is the kernel name and builder:
 
 | | name | root | vermagic | purpose |
 |---|---|---|---|---|
-| `IDENTITY=repro` | `Arkael` | `KSU=sukisu` (ReSukiSU) | `5.10.272-Arkael/8eab6f338 SMP preempt mod_unload modversions aarch64` | prove the pipeline reproduces a kernel that boots |
-| `IDENTITY=own` | `Unbothered` | `KSU=yes` (KernelSU-Next) | `5.10.272-Unbothered/<hash> SMP preempt mod_unload modversions aarch64` | our kernel |
+| `IDENTITY=repro` | `Arkael` | `KSU=yes` (KernelSU-Next) | `5.10.272-Arkael/8eab6f338 SMP preempt mod_unload modversions aarch64` | prove the pipeline reproduces a kernel that boots |
+| `IDENTITY=own` | `Unbothered` | `KSU=yes` (KernelSU-Next) | `5.10.272-Unbothered/8eab6f338 SMP preempt mod_unload modversions aarch64` | our kernel |
+
+`repro` must diff clean against `configs/marble-working.config`, which was
+extracted from the kernel the phone is running. `own` may differ only in
+`CONFIG_LOCALVERSION` (and in `CONFIG_KSU_*`, because it tracks the KernelSU-Next
+tip instead of a frozen commit). So shipping `own` is one rename away from a
+kernel that already boots here, which is the whole reason to trust it.
+
+**Which root flavour, and how we know.** The first repro build came out with
+`CONFIG_KSU_MULTI_MANAGER_SUPPORT`, `KSU_TOOLKIT_SUPPORT` and no Samsung
+support; the phone's config has the opposite: `KSU_SAMSUNG_KDP/RKP/DEFEX`,
+`KSU_CONTAINER_COMPAT`, `KSU_THRONE_TRACKER_ALWAYS_THREADED`, and none of
+BakaSU's options. That set belongs to **pershoot/KernelSU-Next** — the driver
+`build.sh` installs for `KSU=yes` — not to BakaSU, which is what `KSU=sukisu`
+installs. The phone runs KernelSU-Next, so both identities do too.
 
 Do not skip `repro`. It is the only cheap way to learn that a failure belongs
 to your change and not to your pipeline.
-
-`own` is not a leap either: its root stack is exactly what the Templar image
-ships, and that image boots here.
 
 ## Running it
 
