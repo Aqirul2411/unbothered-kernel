@@ -196,12 +196,26 @@ edit("bakasu setup",
      % (want("BAKASU_SETUP_SHA"), want("BAKASU_DRIVER_SHA")))
 
 # KernelSU-Next: the KSU=yes path, i.e. IDENTITY=own only. install_ksu curls
-#    kernel/setup.sh from a branch and then checks that branch out; this does the
-#    same fetch at a fixed commit, so the root driver cannot change under us.
+#    kernel/setup.sh from a branch and then checks that branch out. This does the
+#    same fetch at a fixed commit, and then proves it: setup.sh ends with
+#    `git checkout "$1" ... || echo "Checkout default branch"`, so a commit that
+#    has been rebased away becomes a silent fallback to dev. That is how a build
+#    here once shipped a driver nobody pinned.
+ksun = want("KSUN_SHA")
 edit("ksun setup (own only)",
      "install_ksu 'pershoot/KernelSU-Next' 'dev-susfs'",
-     'curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/%s/kernel/setup.sh" | bash -s -- %s'
-     % (want("KSUN_SHA"), want("KSUN_SHA")))
+     "\n".join([
+         'curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/%s/kernel/setup.sh" | bash -s -- %s' % (ksun, ksun),
+         'git -C "$KSRC/KernelSU-Next" fetch -q origin "%s" 2>/dev/null || true' % ksun,
+         'git -C "$KSRC/KernelSU-Next" checkout -q "%s" 2>/dev/null || true' % ksun,
+         'if [ "$(git -C "$KSRC/KernelSU-Next" rev-parse HEAD 2>/dev/null)" != "%s" ]; then' % ksun,
+         '  echo "ERROR: KernelSU-Next is not at the pinned commit %s" >&2' % ksun,
+         '  echo "ERROR: this repository is force-pushed, so pins go stale." >&2',
+         '  echo "ERROR: the build would have used dev, which is not a pin." >&2',
+         '  echo "ERROR: pick a reachable commit and update KSUN_SHA in configs/pins.env." >&2',
+         '  exit 1',
+         'fi',
+     ]))
 
 # SUSFS: both clone spellings in the script (quoted for susfs_included,
 #    unquoted for the standard path used by KSU=yes).
