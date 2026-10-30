@@ -12,7 +12,10 @@ on:
     tags: ["v*"]
 
 concurrency:
-  group: build-${{ github.ref }}
+  # Keyed on identity as well as ref, so a repro run and an own run do not cancel
+  # each other. Comparing the two is the whole method, and that is hard if only
+  # one of them survives.
+  group: build-${{ github.ref }}-${{ inputs.identity || 'tag' }}
   cancel-in-progress: true
 
 jobs:
@@ -76,6 +79,11 @@ jobs:
           mkdir -p artifacts
           cp -v work/out/arch/arm64/boot/Image artifacts/ 2>/dev/null || true
           cp -v work/*.zip artifacts/ 2>/dev/null || true
+          # One predictable filename to download: the build names its zip after
+          # the variant and date, which is right for an archive and annoying when
+          # you just want to hand someone the flashable.
+          zip=$(ls -1 work/*.zip 2>/dev/null | head -n1 || true)
+          [ -n "$zip" ] && cp -v "$zip" artifacts/unbothered.zip || true
           cp -v work/build.log artifacts/ 2>/dev/null || true
           cp -rv work/verify artifacts/ 2>/dev/null || true
           {
