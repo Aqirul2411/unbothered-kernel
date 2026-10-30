@@ -15,15 +15,15 @@ kernel patch would mean:
 As a module it is one switch: disable it in KernelSU-Next Manager, reboot, done.
 Nothing persists.
 
-The kernel-side changes (KASAN off, zram compiled in, debug symbols off) are in
+The kernel-side changes (KASAN off, debug symbols off) are in
 `configs/tuning.fragment`, because those genuinely are code.
 
 ## What it does
 
-1. **zram, if nothing else has.** Only when `/sys/block/zram0` exists (i.e. the
-   kernel has zram) and it is not already in use. Size = half of RAM, compressor
-   lzo-rle, then `mkswap` + `swapon`. If your ROM's init already set zram up,
-   the module reads `/proc/swaps`, sees it, and leaves it completely alone.
+1. **zram, if nothing else has — as a fallback only.** On this phone the ROM's
+   own init already brings zram up (8 GB, lzo-rle), so the module reads
+   `/proc/swaps`, sees it, and leaves it alone. The setup path exists for ROMs
+   that do not, and is skipped entirely when they do.
 2. **Three tunables that only make sense with compressed swap:**
    - `vm.swappiness=100` — swapping into compressed RAM is cheap; the default of
      60 assumes a disk that costs milliseconds per page.

@@ -79,11 +79,41 @@ Applied only to `IDENTITY=own`, via `configs/tuning.fragment`.
 | change | reason |
 |---|---|
 | `CONFIG_KASAN` off (and `KASAN_HW_TAGS` with it) | memory tagging in a daily driver: CPU on every allocation, memory for tags. A fuzzing tool, not a runtime feature. |
-| `CONFIG_ZRAM=y`, `CONFIG_ZSMALLOC=y` | the tree had the drivers but built neither, so there was no swap at all. Android killed apps instead of compressing cold pages. lzo-rle for the lowest cost per byte. |
 | `CONFIG_DEBUG_INFO` off | ~1 GB of `vmlinux` that never reaches the phone. Build time and artifact size only. |
 
 Untouched on purpose: CFI, PAC, BTI, hardened usercopy, stack protector (security
 that is worth its cost), `CONFIG_FTRACE` (perfetto/System Tracing uses tracefs),
 `CONFIG_KALLSYMS_ALL` (SUSFS and KernelSU-Next resolve symbols through it).
 
-**Device result:** _pending — waiting for the first flash of this batch._
+### Dropped from batch 1 — zram
+
+The first attempt also enabled `CONFIG_ZRAM`, `CONFIG_ZSMALLOC` and
+`CONFIG_CRYPTO_LZO`, on the reasoning that the config showed no swap, so Android
+must be killing apps instead of compressing cold pages.
+
+**The device disproved it.** `unbothered-tune.log` from the phone:
+
+```
+zram0 already in use: /dev/block/zram0  partition  8388604  0  -2
+meminfo: SwapTotal: 8388604 kB  SwapFree: 8388604 kB
+algorithms: lzo [lzo-rle] lz4 zstd
+```
+
+There is already 8 GB of zram swap, and the default compressor is already
+lzo-rle. The kernel config looks empty because the ROM loads zram as a **vendor
+module** from `vendor_dlkm`; built-in config cannot describe a module.
+
+So the change was redundant and slightly harmful (a second driver registering
+`zram0` alongside the vendor module). Deleted rather than kept "just in case".
+
+**Lesson recorded:** `configs/marble-working.config` describes what is built
+into the kernel, not what the phone actually has. Vendor modules are invisible
+to it, and "the config has no zram" is not the same sentence as "the phone has
+no swap".
+
+### Batch 1 — device result
+
+_flashed 2026-10-30: boots, reboots cleanly_. KASAN and debug symbols are gone
+from the build; zram and the sysctls come from the ROM plus
+`tuning/ksu-module`.
+
