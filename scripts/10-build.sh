@@ -13,9 +13,10 @@
 #   3. localversion suffix                 -> KERNEL_SHORT_SHA, not git's choice
 #   4. inject_ksu scripts                  -> pinned to BUILD_SHA, not branch 6.x
 #   5. ReSukiSU setup + driver             -> pinned shas, not branch main
-#   6. susfs4ksu clone                     -> pinned sha
-#   7. KPM Image patch                     -> pinned sha
-#   8. AnyKernel3 clone                    -> pinned sha
+#   6. KernelSU-Next setup + driver        -> pinned sha, not branch dev-susfs
+#   7. susfs4ksu clone                     -> pinned sha
+#   8. KPM Image patch                     -> pinned sha
+#   9. AnyKernel3 clone                    -> pinned sha
 #
 # Outputs:
 #   work/out/arch/arm64/boot/Image
@@ -76,7 +77,7 @@ say "identity: $IDENTITY  (kernel name: $NAME, built by $KUSER@$KHOST)"
 # edit that silently did nothing.
 export NAME KUSER KHOST
 export KERNEL_REPO KERNEL_BRANCH KERNEL_SHA KERNEL_CLONE_DEPTH KERNEL_SHORT_SHA
-export BUILD_SHA BAKASU_SETUP_SHA BAKASU_DRIVER_SHA
+export BUILD_SHA BAKASU_SETUP_SHA BAKASU_DRIVER_SHA KSUN_SHA
 export SUSFS_SHA SUSFS_CLONE_DEPTH SUKISU_PATCH_SHA ANYKERNEL_SHA
 
 python3 - "$WORK/build.sh" <<'PY'
@@ -152,7 +153,15 @@ edit("bakasu setup",
      'curl -LSs "https://raw.githubusercontent.com/Arkael-Dev/BakaSU/%s/kernel/setup.sh" | bash -s -- %s'
      % (want("BAKASU_SETUP_SHA"), want("BAKASU_DRIVER_SHA")))
 
-# 6. SUSFS: both clone spellings in the script (quoted for susfs_included,
+# 6. KernelSU-Next: the KSU=yes path, i.e. IDENTITY=own only. install_ksu curls
+#    kernel/setup.sh from a branch and then checks that branch out; this does the
+#    same fetch at a fixed commit, so the root driver cannot change under us.
+edit("ksun setup (own only)",
+     "install_ksu 'pershoot/KernelSU-Next' 'dev-susfs'",
+     'curl -LSs "https://raw.githubusercontent.com/pershoot/KernelSU-Next/%s/kernel/setup.sh" | bash -s -- %s'
+     % (want("KSUN_SHA"), want("KSUN_SHA")))
+
+# 7. SUSFS: both clone spellings in the script (quoted for susfs_included,
 #    unquoted for the standard path used by KSU=yes).
 susfs_sha = want("SUSFS_SHA")
 susfs_depth = want("SUSFS_CLONE_DEPTH")
@@ -171,12 +180,12 @@ edit("susfs clone (unquoted)",
          "git -C $SUSFS_DIR checkout -q %s" % susfs_sha,
      ]))
 
-# 7. the binary KPM patch applied to the finished Image
+# 8. the binary KPM patch applied to the finished Image
 edit("kpm patch",
      "SukiSU_patch/raw/refs/heads/main/kpm/patch_linux",
      "SukiSU_patch/raw/%s/kpm/patch_linux" % want("SUKISU_PATCH_SHA"))
 
-# 8. AnyKernel3 packaging
+# 9. AnyKernel3 packaging
 edit("anykernel clone",
      "git clone -q --depth=1 $ANYKERNEL_REPO -b $ANYKERNEL_BRANCH anykernel",
      "\n".join([
