@@ -165,8 +165,19 @@ edit("builder host",
      'HOST="%s"' % e("KHOST"))
 
 # kernel at the pinned commit, not at the branch tip
+#
+# build.sh hardcodes KERNEL_REPO and KERNEL_BRANCH for KVER=5.10 (lines 44 and 46
+# of the pinned script), so exporting them from pins.env was decoration. It only
+# mattered when Arkael renamed bore-bbrv3: the build then cloned the hardcoded
+# name and died. Both are replaced from configs/pins.env now.
 depth = want("KERNEL_CLONE_DEPTH")
 sha = want("KERNEL_SHA")
+edit("kernel repo",
+     'KERNEL_REPO="https://github.com/Arkael-Dev/arkael-kernel-a12-5.10.git"',
+     'KERNEL_REPO="%s"' % want("KERNEL_REPO"))
+edit("kernel branch",
+     'KERNEL_BRANCH="bore-bbrv3"',
+     'KERNEL_BRANCH="%s"' % want("KERNEL_BRANCH"))
 edit("kernel clone",
      "git clone -q --depth=1 $KERNEL_REPO -b $KERNEL_BRANCH $KSRC",
      "\n".join([
