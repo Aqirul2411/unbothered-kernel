@@ -113,9 +113,12 @@ no swap".
 
 ### Batch 1 — device result
 
-_flashed 2026-10-30: boots, reboots cleanly_. KASAN and debug symbols are gone
-from the build; zram and the sysctls come from the ROM plus
-`tuning/ksu-module`.
+**Built and verified** (run 41026583256): config diff is exactly KASAN off,
+DEBUG_INFO off and their side effects; `ksu-marble-working.config.diff` is 0
+bytes, i.e. the root stack still matches the phone exactly.
+
+_Pending flash._ Batch 0 is the one currently on the phone and known to boot
+twice; it is kept as `unbothered-batch0-boots.zip` in the handover folder.
 
 ---
 
