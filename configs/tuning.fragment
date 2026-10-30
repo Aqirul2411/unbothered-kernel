@@ -62,6 +62,23 @@ CONFIG_DAMON_VADDR=y
 CONFIG_DAMON_DBGFS=y
 
 # ---------------------------------------------------------------------------
+# 4. BBRplus congestion control: build it, do not default to it.
+#
+# Added by patches/0001-tcp-bbrplus.patch (net/ipv4/tcp_bbrplus.c + Kconfig +
+# Makefile). BBRplus is BBR with drain-to-target cycling, tuned for low latency
+# and sustained throughput on mobile links; taken from zylhdrXP's GKI fork where
+# it ships in release builds.
+#
+# Building it only makes it available. The default stays BBRv3, so this changes
+# nothing until something selects it:
+#
+#   su -c 'echo bbrplus > /proc/sys/net/ipv4/tcp_congestion_control'
+#
+# ...which needs root. Same gate as DAMON.
+# ---------------------------------------------------------------------------
+CONFIG_TCP_CONG_BBRPLUS=y
+
+# ---------------------------------------------------------------------------
 # REVERTED, do not add back: CONFIG_KASAN off.
 #
 # Reason: the build with KASAN off **hangs this phone at the POCO logo**, with no

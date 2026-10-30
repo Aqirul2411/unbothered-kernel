@@ -21,6 +21,34 @@ name. Keeping changes here — rather than forking the tree — means every chan
 to the source is a file with a header explaining it, and reverting one is
 deleting a file.
 
+## What is in here
+
+### `0001-tcp-bbrplus.patch`
+
+TCP BBRplus congestion control, taken from `zylhdrXP/android_kernel_common-5.10`
+(branch `android12-5.10`), where it ships in the FleurX-GKI release builds.
+
+Three files, nothing else:
+
+```
+net/ipv4/tcp_bbrplus.c   new, 21.8 KB, registers itself
+net/ipv4/Kconfig         one config block + a DEFAULT_BBRPLUS choice entry
+net/ipv4/Makefile        one obj- line
+```
+
+It does **not** touch `tcp.h` or `tcp_cong.c`, which is what keeps this
+low-risk. Verified by diffing against this tree's own files and applying to a
+scratch copy: `patch -p1 --dry-run` applies cleanly.
+
+Building it only makes it available. The default congestion control stays
+`bbr3`, so behaviour does not change until something selects it:
+
+```
+su -c 'echo bbrplus > /proc/sys/net/ipv4/tcp_congestion_control'
+```
+
+Attribution kept in the file header: dog250 and cx9208, GPL-2.0-only.
+
 ## experimental/stable-5.10.273-vanilla.patch — rejected
 
 Upstream stable update 5.10.272 → 5.10.273, from
