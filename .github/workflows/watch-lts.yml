@@ -1,0 +1,97 @@
+name: watch-lts
+
+# Watches Google's android12-5.10-lts branch, which is the real upstream for this
+# kernel tree. kernel.org's vanilla 5.10.x tags are NOT: this kernel is AOSP
+# android12-5.10, and a vanilla stable patch rejects in exactly the files where
+# Android carries its own code (arm64 fault handling, f2fs, net core, mmap).
+# See patches/README.md for that experiment.
+#
+# When this branch moves past the version we build, the next step is:
+#   1. git clone --depth N https://android.googlesource.com/kernel/common -b android12-5.10-lts
+#   2. git diff <pin>..<new> > patches/000N-stable-<version>.patch
+#   3. push and let the build's .rej gate decide
+#
+# It does not modify anything. It only opens an issue when there is something to do.
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Read the upstream version
+        id: upstream
+        run: |
+          set -euo pipefail
+          curl -sS --fail \
+            "https://android.googlesource.com/kernel/common/+/refs/heads/android12-5.10-lts/Makefile?format=TEXT" \
+            | base64 -d > /tmp/Makefile
+          V="$(awk '/^VERSION /{v=$3} /^PATCHLEVEL /{p=$3} /^SUBLEVEL /{s=$3} END{print v"."p"."s}' /tmp/Makefile)"
+          echo "upstream android12-5.10-lts is $V"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Read the version we build
+        id: ours
+        run: |
+          set -euo pipefail
+          V="$(grep -E '^EXPECTED_LINUX_VERSION=' configs/pins.env | cut -d'"' -f2)"
+          echo "we build $V"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Compare
+        id: cmp
+        run: |
+          set -euo pipefail
+          up="${{ steps.upstream.outputs.version }}"
+          ours="${{ steps.ours.outputs.version }}"
+          newer="$(printf '%s\n%s\n' "$ours" "$up" | sort -V | tail -n1)"
+          if [ "$newer" = "$up" ] && [ "$up" != "$ours" ]; then
+            echo "newer=true" >> "$GITHUB_OUTPUT"
+            echo "upstream $up is ahead of $ours"
+          else
+            echo "newer=false" >> "$GITHUB_OUTPUT"
+            echo "nothing to do: upstream $up, ours $ours"
+          fi
+
+      - name: Open an issue when there is something to merge
+        if: steps.cmp.outputs.newer == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          title="android12-5.10-lts moved to ${{ steps.upstream.outputs.version }}"
+          # do not spam: only one open issue per version
+          if gh issue list --state open --search "$title in:title" --json title --jq '.[].title' | grep -qx "$title"; then
+            echo "an issue for this version already exists"
+            exit 0
+          fi
+          {
+            echo "Our kernel is based on \`android12-5.10-lts\` at **${{ steps.ours.outputs.version }}**."
+            echo ""
+            echo "Google has merged **${{ steps.upstream.outputs.version }}** into that branch."
+            echo ""
+            echo "This is the only correct source for a stable update here. kernel.org's vanilla tags reject in the files where Android keeps its own code - see \`patches/README.md\`."
+            echo ""
+            echo "Next steps:"
+            echo ""
+            echo '```'
+            echo "git clone --filter=blob:none https://android.googlesource.com/kernel/common aosp-5.10"
+            echo "cd aosp-5.10"
+            echo "git checkout android12-5.10-lts"
+            echo "git diff <our-pin>..HEAD > patches/000N-stable-${{ steps.upstream.outputs.version }}.patch"
+            echo '```'
+            echo ""
+            echo "Then push and let the build decide: any \`.rej\` fails it with the file list."
+            echo ""
+            echo "Expect conflicts where this tree diverges from AOSP, most likely Arkael's BBRv3 backport in \`net/ipv4/\`."
+          } > /tmp/body.md
+          gh issue create --title "$title" --body-file /tmp/body.md
