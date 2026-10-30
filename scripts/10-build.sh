@@ -36,6 +36,13 @@ source "$ROOT/configs/pins.env"
 # shellcheck source=/dev/null
 source "$ROOT/configs/identity.env"
 
+# One-run override of the root driver pin, for bisecting a boot failure without
+# a commit per attempt. configs/pins.env stays the source of truth; this only
+# changes what this one run builds.
+if [ -n "${KSUN_OVERRIDE:-}" ]; then
+  KSUN_SHA="$KSUN_OVERRIDE"
+fi
+
 die()  { echo "ERROR: $*" >&2; exit 1; }
 say()  { echo "[build] $*"; }
 
@@ -303,6 +310,7 @@ export GITHUB_ENV="${GITHUB_ENV:-$WORK/.github_env}"
 : > "$GITHUB_ENV"
 
 say "KVER=$KVER KSU=$KSU KSU_SUSFS=$KSU_SUSFS STATUS=$STATUS governor=$GOVERNOR_CHOICE"
+say "driver: KernelSU-Next $KSUN_SHA"
 say "config reference: configs/$REF_CONFIG   root reference: ${KSU_REF_CONFIG:-none}"
 
 # --- run -------------------------------------------------------------------

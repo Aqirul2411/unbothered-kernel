@@ -13,6 +13,10 @@ on:
         type: choice
         options: ["on", "off"]
         default: on
+      ksun_sha:
+        description: "optional: override the KernelSU-Next pin for one run (empty = configs/pins.env)"
+        required: false
+        default: ""
   push:
     tags: ["v*"]
 
@@ -77,6 +81,7 @@ jobs:
         env:
           IDENTITY: ${{ inputs.identity || 'own' }}
           TUNING: ${{ inputs.tuning || 'on' }}
+          KSUN_OVERRIDE: ${{ inputs.ksun_sha }}
         run: ./scripts/10-build.sh
 
       - name: Collect
