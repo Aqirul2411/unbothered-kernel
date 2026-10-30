@@ -103,8 +103,7 @@ that is worth its cost), `CONFIG_FTRACE` (perfetto/System Tracing uses tracefs),
 one flash. That turned a five-minute bisect into an hour and a phone that would
 not boot. One change per flash is the difference between a symptom and a
 diagnosis. The `TUNING` switch exists so the next question costs one dispatch.
-### Dropped from batch 1 — zram
-
+### Dropped from batch 1 - zram
 The first attempt also enabled `CONFIG_ZRAM`, `CONFIG_ZSMALLOC` and
 `CONFIG_CRYPTO_LZO`, on the reasoning that the config showed no swap, so Android
 must be killing apps instead of compressing cold pages.
@@ -129,6 +128,25 @@ into the kernel, not what the phone actually has. Vendor modules are invisible
 to it, and "the config has no zram" is not the same sentence as "the phone has
 no swap".
 
+
+---
+
+### Batch 2 - HZ=250, one line
+
+**Built and verified** (run 41054425557): accepted diff is the rename, `HZ 300 -> 250`
+and the `DEBUG_INFO` family. `significant.diff` is 0 bytes, the KSU block still
+matches the phone exactly, and the Image is 35,871,068 bytes - the same size as
+the previous build, which is what a tick-rate change should look like.
+
+**Why 250:** SilverCore 5.10.200 (2023) and GrayRavens (same GKI base, 2026) both
+chose it over the 300 that Arkael's inject script sets. 17% fewer timer
+interrupts, paid at idle as well as under load.
+
+**Deliberately alone.** Batch 1 moved a config and a driver in one flash and
+turned a five-minute bisect into a phone stuck at the logo.
+
+_Device result: pending flash. Revert if idle drain moves less than the noise
+floor (~0.2 %/h), rather than carrying a change that did nothing._
 
 ---
 
