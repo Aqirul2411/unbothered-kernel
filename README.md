@@ -194,6 +194,10 @@ public, keep the attribution.
 
 ## Result so far
 
+**Status: BOOTS.** `unbothered.zip` was flashed on the device and the phone
+booted (2026-10-30). The root stack is KernelSU-Next + SUSFS at the dev-susfs
+tip, kernel name `Unbothered`, version `5.10.272`.
+
 Two builds passed verification against the config extracted from the phone.
 
 **`repro`, run 41020062047** — the pipeline reproduces the phone's kernel:
