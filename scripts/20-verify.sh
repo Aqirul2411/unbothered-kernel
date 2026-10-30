@@ -68,12 +68,40 @@ diff -u "$REF" "$OUT/built.config" > "$OUT/config.diff" || true
 # Only config statements matter; the diff also carries context and hunk headers.
 grep -E '^[-+](CONFIG_|# CONFIG_)' "$OUT/config.diff" > "$OUT/config.changed" || true
 
-# The allowlist is a deliberate exception for `own`, and never for `repro`.
+# What this build is allowed to change, and nothing else:
+#
+#   configs/verify-allow.txt   hand-written exceptions (the rename, the driver)
+#   configs/tuning.fragment    every symbol the tuning actually sets
+#
+# The second one is derived rather than remembered, so adding a knob to the
+# fragment cannot silently widen what verification tolerates: a symbol that
+# changes without being in that file still fails the build. `repro` reads
+# neither, because a reproduction has to diff clean.
 ALLOW_RE='^$'
 ALLOWED_COUNT=0
-if [ "$IDENTITY" = "own" ] && [ -f "$ALLOW" ]; then
-  ALLOW_RE="$(grep -vE '^[[:space:]]*(#|$)' "$ALLOW" | paste -sd'|' - || true)"
-  [ -n "$ALLOW_RE" ] || ALLOW_RE='^$'
+TUNED_COUNT=0
+
+if [ "$IDENTITY" = "own" ]; then
+  ALLOW_RE="$(grep -vE '^[[:space:]]*(#|$)' "$ALLOW" 2>/dev/null | paste -sd'|' - || true)"
+
+  TUNING="$ROOT/configs/tuning.fragment"
+  if [ -f "$TUNING" ]; then
+    TUNE_RE="$(grep -oE 'CONFIG_[A-Z0-9_]+' "$TUNING" | sort -u | sed 's/^/^(# )?/' | paste -sd'|' - || true)"
+    TUNED_COUNT=$(grep -oE 'CONFIG_[A-Z0-9_]+' "$TUNING" | sort -u | wc -l | tr -d ' ')
+    if [ -n "$TUNE_RE" ]; then
+      if [ -n "$ALLOW_RE" ]; then
+        ALLOW_RE="$ALLOW_RE|$TUNE_RE"
+      else
+        ALLOW_RE="$TUNE_RE"
+      fi
+    fi
+  fi
+fi
+
+[ -n "$ALLOW_RE" ] || ALLOW_RE='^$'
+
+if [ "$TUNED_COUNT" -gt 0 ]; then
+  say "tuning may differ on $TUNED_COUNT symbol(s), from configs/tuning.fragment"
 fi
 
 awk -v re="$ALLOW_RE" '

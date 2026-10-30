@@ -72,6 +72,16 @@ fi
 
 say "identity: $IDENTITY  (kernel name: $NAME, built by $KUSER@$KHOST)"
 
+# --- tuning ----------------------------------------------------------------
+# Only `own` gets the tuning fragment. `repro` exists to be byte-identical to the
+# phone's kernel, so it must not have opinions about zram or debug options: an
+# empty config diff is the whole point of it.
+rm -f "$WORK/tuning.fragment"
+if [ "$IDENTITY" = "own" ]; then
+  cp "$ROOT/configs/tuning.fragment" "$WORK/tuning.fragment"
+  say "tuning: $(grep -cE '^(CONFIG_|# CONFIG_)' "$WORK/tuning.fragment") settings from configs/tuning.fragment"
+fi
+
 # --- edit the pinned build script ------------------------------------------
 # Done in python, not sed: every replacement is a plain exact string with a
 # count assertion, so a moved line is a one-line error message instead of an
@@ -144,6 +154,21 @@ edit("infinix camera patch",
      "\n".join([
          'curl -L "https://github.com/ramabondanp/android_kernel_common-5.10/commit/4fe04b60009e.patch" -o infinix_cam.patch',
          'echo "%s  infinix_cam.patch" | sha256sum -c -' % want("INFINIX_CAM_SHA256"),
+     ]))
+
+# our tuning, appended to the defconfig right before the build turns it into a
+# .config, so it gets the last word on every symbol it sets. The file only
+# exists for IDENTITY=own (see the copy step earlier): reproducing the phone's
+# kernel must not have opinions.
+edit("tuning fragment",
+     'log "Generating config..."\nmake ${MAKE_ARGS[@]} $KERNEL_DEFCONFIG',
+     "\n".join([
+         'log "Generating config..."',
+         'if [ -f "$WORKDIR/tuning.fragment" ]; then',
+         '  log "Applying local tuning fragment..."',
+         '  cat "$WORKDIR/tuning.fragment" >> "$KSRC/arch/arm64/configs/gki_defconfig"',
+         'fi',
+         'make ${MAKE_ARGS[@]} $KERNEL_DEFCONFIG',
      ]))
 
 # the defconfig injection script, fetched from a moving branch by default.
