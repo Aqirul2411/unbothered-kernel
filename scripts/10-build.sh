@@ -90,6 +90,17 @@ say "identity: $IDENTITY  (kernel name: $NAME, built by $KUSER@$KHOST)"
 TUNING="${TUNING:-on}"
 rm -f "$WORK/tuning.fragment"
 rm -f "$WORK/banner"
+rm -rf "$WORK/patches"
+
+# Kernel source patches, applied in filename order after the tree is checked out.
+# This is the only place the kernel source itself is modified, and every patch is
+# a file in patches/ with a reason in its header. Nothing is applied silently: a
+# patch that does not apply stops the build with the patch name.
+if [ "$IDENTITY" = "own" ] && ls "$ROOT"/patches/*.patch >/dev/null 2>&1; then
+  mkdir -p "$WORK/patches"
+  cp "$ROOT"/patches/*.patch "$WORK/patches/"
+  say "patches: $(ls -1 "$ROOT"/patches/*.patch | wc -l | tr -d ' ') to apply"
+fi
 if [ "$IDENTITY" = "own" ]; then
   # Branding is not tuning: a build with the config tuning switched off is still
   # an Unbothered build, and its installer should say so.
@@ -163,6 +174,23 @@ edit("kernel clone",
          "git -C $KSRC fetch -q --depth=%s origin $KERNEL_BRANCH" % depth,
          "git -C $KSRC checkout -q %s" % sha,
          '[ "$(git -C $KSRC rev-parse HEAD)" = "%s" ]' % sha,
+         # Source patches. kernel.org's incremental patches are plain unified
+         # diffs with no index lines, so `git apply --3way` cannot merge them;
+         # `patch -p1` with fuzz can, but it leaves .rej files instead of
+         # failing. So: apply, then treat any .rej as a hard failure. A half
+         # merged kernel must never reach the compiler quietly.
+         'for _p in "$WORKDIR"/patches/*.patch; do',
+         '  [ -f "$_p" ] || continue',
+         '  log "Applying source patch $(basename "$_p")"',
+         '  ( cd $KSRC && patch -p1 --forward --fuzz=2 --no-backup-if-mismatch < "$_p" ) >/dev/null 2>&1 || true',
+         '  _rej=$(find $KSRC -name "*.rej" -type f 2>/dev/null | head -20)',
+         '  if [ -n "$_rej" ]; then',
+         '    echo "ERROR: $(basename "$_p") did not apply cleanly. Rejects:" >&2',
+         '    echo "$_rej" >&2',
+         '    exit 1',
+         '  fi',
+         '  log "  applied (no rejects)"',
+         'done',
      ]))
 
 # the localversion suffix. build.sh asks git for a short hash and lets git
