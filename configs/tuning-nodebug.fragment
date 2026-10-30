@@ -1,0 +1,12 @@
+# Tuning, reduced to the part that cannot plausibly affect boot.
+#
+# This is the same idea as configs/tuning.fragment, minus KASAN. It exists for
+# exactly one situation: "the tuned build does not boot, and KASAN is the
+# suspect". Building this says whether the sanitizer removal was the cause
+# without giving up the debug-symbol removal, which has no runtime effect at all.
+#
+# Selected with TUNING=nodebug, never used by configs/tuning.fragment.
+
+# CONFIG_DEBUG_INFO is not set
+# CONFIG_GDB_SCRIPTS is not set
+# CONFIG_DEBUG_EFI is not set

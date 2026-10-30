@@ -11,7 +11,7 @@ on:
       tuning:
         description: "on = apply configs/tuning.fragment; off = same commit without tuning (bisect switch)"
         type: choice
-        options: ["on", "off"]
+        options: ["on", "off", "nodebug"]
         default: on
       ksun_sha:
         description: "optional: override the KernelSU-Next pin for one run (empty = configs/pins.env)"
@@ -24,7 +24,7 @@ concurrency:
   # Keyed on identity as well as ref, so a repro run and an own run do not cancel
   # each other. Comparing the two is the whole method, and that is hard if only
   # one of them survives.
-  group: build-${{ github.ref }}-${{ inputs.identity || 'tag' }}
+  group: build-${{ github.ref }}-${{ inputs.identity || 'tag' }}-${{ inputs.tuning || 'on' }}
   cancel-in-progress: true
 
 jobs:

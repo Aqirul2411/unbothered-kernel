@@ -89,14 +89,20 @@ say "identity: $IDENTITY  (kernel name: $NAME, built by $KUSER@$KHOST)"
 # the setting or something else (the root driver) is responsible.
 TUNING="${TUNING:-on}"
 rm -f "$WORK/tuning.fragment"
-if [ "$IDENTITY" = "own" ] && [ "$TUNING" = "on" ]; then
-  cp "$ROOT/configs/tuning.fragment" "$WORK/tuning.fragment"
-  say "tuning: $(grep -cE '^(CONFIG_|# CONFIG_)' "$WORK/tuning.fragment") settings from configs/tuning.fragment"
-
-  # The recovery banner. AnyKernel3 prints this text at install time, and the
-  # pinned AnyKernel3 draws Arkael's name in it. `repro` keeps Arkael's, because
-  # repro is supposed to be indistinguishable from the phone's kernel.
+rm -f "$WORK/banner"
+if [ "$IDENTITY" = "own" ]; then
+  # Branding is not tuning: a build with the config tuning switched off is still
+  # an Unbothered build, and its installer should say so.
   cp "$ROOT/assets/banner" "$WORK/banner"
+fi
+if [ "$IDENTITY" = "own" ] && [ "$TUNING" != "off" ]; then
+  case "$TUNING" in
+    on)      TUNING_FILE="$ROOT/configs/tuning.fragment" ;;
+    nodebug) TUNING_FILE="$ROOT/configs/tuning-nodebug.fragment" ;;
+    *)       die "TUNING must be on, off or nodebug, got '$TUNING'" ;;
+  esac
+  cp "$TUNING_FILE" "$WORK/tuning.fragment"
+  say "tuning: $TUNING ($(grep -cE '^(CONFIG_|# CONFIG_)' "$WORK/tuning.fragment") settings from $(basename "$TUNING_FILE"))"
 else
   say "tuning: off (no config changes this build)"
 fi
