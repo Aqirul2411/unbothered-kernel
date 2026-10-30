@@ -117,3 +117,41 @@ _flashed 2026-10-30: boots, reboots cleanly_. KASAN and debug symbols are gone
 from the build; zram and the sysctls come from the ROM plus
 `tuning/ksu-module`.
 
+---
+
+## Peers analysed
+
+Two other kernels' embedded configs were extracted and read, because a config
+disagreement between people shipping to the same hardware is the cheapest
+research there is.
+
+### SilverCore `5.10.200` (2023, Xiaomi sm8450 vendor tree)
+
+Shipped in a PixelOS-era marble ROM. Notable: `KASAN` off, `DEBUG_INFO` off,
+`LRU_GEN=y` + `LRU_GEN_ENABLED=y` (**MGLRU working on this hardware** — this is
+what re-opened that question), `HZ=250`, `INIT_ON_ALLOC` off, zram not built in.
+
+### GrayRavens / Zenithed V8.0 (`android12-5.10`, LTS 5.10.258, 2026)
+
+Same base as this project. Custom `ZENITH` CPU governor, `ZIOS` I/O scheduler,
+`HIKARI`/`IYASHI`/`KASUMI` scheduler and placement patches, GPU governor
+auto-switcher.
+
+**It bootloops on marble.** Reported by the phone's owner, and consistent with
+what is in it: the features are large home-grown subsystems, not flags.
+
+What it does inform:
+
+| theirs | verdict for us |
+|---|---|
+| `HZ=250` | **take it** — third independent vote for 250 |
+| `WQ_POWER_EFFICIENT_DEFAULT=y` | candidate, separate batch: real idle-drain knob, mild behaviour change |
+| `SCHED_PREFER_SILVER=y` | candidate for a later, measured batch; idle-battery win, responsiveness cost |
+| `KASAN=y` + `kasan.stacktrace=off` | keeps the sanitizer but makes it cheap on MTE hardware. Our removal is still valid (matches Google's production `gki_defconfig`), but this is why KASAN was not the huge win it was described as here |
+| `SCHED_AUTOGROUP`, `DEFAULT_CAKE`, `BFQ`, `PAGE_POISONING`, `DAMON_*`, `ZRAM_WRITEBACK` | reject: fights Android cgroups, CPU per packet, desktop scheduler, debug cost, no userspace driver, needs a backing device |
+| `ZENITH`, `ZIOS`, `HIKARI`, `IYASHI`, `KASUMI` | reject: thousands of lines, no public source in a releases-only repo, and a bootloop on the exact phone |
+
+**Lesson:** a famous kernel is one data point, not a template. GrayRavens also
+ships `DEBUG_INFO=y`, which is nobody's idea of a performance decision.
+
+
