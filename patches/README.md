@@ -49,6 +49,26 @@ su -c 'echo bbrplus > /proc/sys/net/ipv4/tcp_congestion_control'
 
 Attribution kept in the file header: dog250 and cx9208, GPL-2.0-only.
 
+### `0002-cpuidle-teo-rework.patch`
+
+The current upstream TEO idle governor, taken from
+`lifeats666ln/kernel_common-5.10` (android12-5.10, 5.10.272 â€” the same base we
+build), where it is already backported and tested on real devices. Rafael
+J. Wysocki's series, roughly 30 commits, arrives as one file:
+`drivers/cpuidle/governors/teo.c`, 304 lines added, 365 removed.
+
+**This is not cosmetic.** The tree carries Arm's util-awareness mechanism in
+`teo.c`; that series *reverts* it, because upstream found it did not help and the
+rework made it unnecessary. Idle-state selection decides how deep the phone
+sleeps, so this changes behaviour, not just code.
+
+Risk is medium and isolated: one file, no boot dependency, and TEO is already the
+live governor (`/sys/devices/system/cpu/cpuidle/current_governor` says `teo`).
+Measured by idle drain, like everything else.
+
+Verified with `patch -p1 --dry-run` against this tree's own file before commit:
+applies cleanly.
+
 ## experimental/stable-5.10.273-vanilla.patch — rejected
 
 Upstream stable update 5.10.272 → 5.10.273, from
