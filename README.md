@@ -49,6 +49,7 @@ binary patch from branches that move.
 | `simonpunk/susfs4ksu` | `5419f4ee` (`gki-android12-5.10`) | the SUSFS patches themselves |
 | `SukiSU_patch/kpm/patch_linux` | `547ae94b` | binary KPM patch applied to the finished Image |
 | `Arkael-Dev/AnyKernel3` | `26b22266` | packaging only; cannot change the Image |
+| Infinix camera patch (5.10) | `4fe04b60009e`, sha256-checked | source patch the build applies to `v4l2-ctrls.c` |
 | Neutron clang `30072026` | URL inside the pinned `build.sh` | toolchain version changes codegen and CFI hashes |
 
 Three of those shas are not documented by anyone: they are the commits that
@@ -65,16 +66,16 @@ from `android.googlesource.com` at whatever HEAD is.
 
 `scripts/10-build.sh` does not reimplement Arkael's build script and does not
 pipe it through a pile of `sed`. It hands the pinned file to a small embedded
-python patcher with twelve exact-string replacements, each annotated with the
+python patcher with thirteen exact-string replacements, each annotated with the
 number of occurrences it expects. If a pin moves and a line no longer matches,
 the build stops with the edit's name, the expected count and the text it looked
 for — before compiling anything.
 
-Twelve, not the seven you'd guess, because that is how many places the pinned
+Thirteen, not the seven you'd guess, because that is how many places the pinned
 script reaches outside itself: identity (3), the kernel checkout, the
-localversion suffix, the `inject_ksu` base URL (3 files), the ReSukiSU setup,
-KernelSU-Next for `own`, the SUSFS clone in its quoted and unquoted spelling,
-the KPM binary patch, and AnyKernel3.
+localversion suffix, the Infinix camera patch, the `inject_ksu` base URL (3
+files), the ReSukiSU setup, KernelSU-Next for `own`, the SUSFS clone in its
+quoted and unquoted spelling, the KPM binary patch, and AnyKernel3.
 
 The unmodified script is kept beside it as `work/build.sh.pinned`, so
 `diff work/build.sh.pinned work/build.sh` always shows exactly what we changed
