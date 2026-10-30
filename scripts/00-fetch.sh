@@ -22,14 +22,26 @@ command -v git >/dev/null || die "git not found"
 mkdir -p "$ROOT/src"
 
 # --- build system ----------------------------------------------------------
+# Arkael-Dev/build-arkael was deleted on 2026-10-31. The pinned commit is
+# vendored in vendor/ as a git bundle, so the build no longer depends on a
+# third-party repository staying online. The network clone stays as a fallback
+# for the case where the bundle is missing.
+BUNDLE="$ROOT/vendor/build-arkael-$(printf '%s' "$BUILD_SHA" | cut -c1-7).bundle"
+
 if [ ! -d "$ROOT/src/build-arkael/.git" ]; then
-  say "cloning $BUILD_REPO"
-  git clone -q "$BUILD_REPO" "$ROOT/src/build-arkael"
+  if [ -f "$BUNDLE" ]; then
+    say "using the vendored build system ($(basename "$BUNDLE"))"
+    git clone -q "$BUNDLE" "$ROOT/src/build-arkael"
+  else
+    say "no bundle at $BUNDLE, trying $BUILD_REPO"
+    git clone -q "$BUILD_REPO" "$ROOT/src/build-arkael" \
+      || die "cannot obtain the build system: upstream is gone and no bundle exists"
+  fi
 fi
 # A full clone on purpose: it is under 2 MB, and it means the pin can be any
-# commit on any branch, not just a branch tip. Fetching a bare sha is not
-# something every remote allows.
-git -C "$ROOT/src/build-arkael" fetch -q --all --tags
+# commit on any branch, not just a branch tip. A bundle clone has nothing to
+# fetch from, hence the || true.
+git -C "$ROOT/src/build-arkael" fetch -q --all --tags || true
 git -C "$ROOT/src/build-arkael" -c advice.detachedHead=false checkout -q "$BUILD_SHA"
 
 BHEAD="$(git -C "$ROOT/src/build-arkael" rev-parse HEAD)"
