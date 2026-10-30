@@ -11,7 +11,7 @@ on:
       tuning:
         description: "on = apply configs/tuning.fragment; off = same commit without tuning (bisect switch)"
         type: choice
-        options: [on, off]
+        options: ["on", "off"]
         default: on
   push:
     tags: ["v*"]
