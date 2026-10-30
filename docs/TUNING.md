@@ -37,6 +37,31 @@ vendor patches, SUSFS and BBRv3.
 5.10 with this exact patch stack, tested on a spare device, with serial console
 or last_kmsg capture so a hang is diagnosable. None of that is true today.
 
+**Checked, 2026-10-30:**
+
+| thing | result |
+|---|---|
+| our tree (`8eab6f338`) has `mm/lru_gen.c` | no |
+| our tree's `mm/Kconfig` has `LRU_GEN` | no |
+| our `mm/vmscan.c` has MGLRU hooks | no (only stock `lruvec_` helpers) |
+| Melt kernel (marble, Xiaomi sm8450 5.10, most used custom kernel here) has MGLRU | no |
+| a working 5.10 backport known on this hardware | none found |
+
+So MGLRU here is not a feature being switched on: it is replacing the LRU core
+(`vmscan`, `mmzone`, `memcontrol`, `swap`, `page_alloc`, `workingset`) with
+roughly ten thousand lines from 6.1, against a tree that also carries Android
+and vendor patches. That is the largest possible change available on this
+kernel, and the only prior attempt on this phone hung.
+
+**If it is ever attempted**, the only defensible shape is: compiled in but
+disabled by default (`CONFIG_LRU_GEN_ENABLED=n`), enabled at runtime through
+`/sys/kernel/mm/lru_gen/enabled`, in a separate experimental zip, never in the
+same build as the kernel people rely on. A hang then costs a power cycle rather
+than a recovery session, because nothing persists and the next boot is back on
+the legacy LRU. Compiled-but-off still is not free: a broken backport can corrupt
+core structures at init, before any toggle matters.
+
+
 **Side effect worth knowing:** `inject_ksu/gki_defconfig.sh` still carries
 `CONFIG_MGLRU=y` and `CONFIG_MGLRU_ENHANCEMENTS=y`, left behind when the code
 was removed. Kconfig silently ignores unknown symbols, so those lines have been
