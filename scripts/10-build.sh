@@ -82,7 +82,9 @@ python3 - "$WORK/build.sh" <<'PY'
 import os, sys, pathlib
 
 path = pathlib.Path(sys.argv[1])
-src = path.read_text()
+# Explicit utf-8: build.sh contains emoji in its log strings, and on a runner
+# with a C locale the default encoding can be ascii or something else.
+src = path.read_text(encoding="utf-8")
 env = os.environ
 e = env.__getitem__
 
@@ -186,7 +188,7 @@ for label, old, new, count in edits:
         )
     src = src.replace(old, new)
 
-path.write_text(src)
+path.write_text(src, encoding="utf-8")
 print("[build] patched %d hunks in the pinned build.sh" % len(edits))
 for label, _, _, _ in edits:
     print("        - %s" % label)

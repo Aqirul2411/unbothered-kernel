@@ -64,10 +64,15 @@ from `android.googlesource.com` at whatever HEAD is.
 
 `scripts/10-build.sh` does not reimplement Arkael's build script and does not
 pipe it through a pile of `sed`. It hands the pinned file to a small embedded
-python patcher with seven exact-string replacements, each annotated with the
+python patcher with ten exact-string replacements, each annotated with the
 number of occurrences it expects. If a pin moves and a line no longer matches,
 the build stops with the edit's name, the expected count and the text it looked
 for — before compiling anything.
+
+Ten, not seven, because that is how many separate fetches the pinned script
+does: identity (3), the kernel checkout, the `inject_ksu` base URL (3 files),
+the ReSukiSU setup, the SUSFS clone in its quoted and unquoted spelling, the KPM
+binary patch, and AnyKernel3.
 
 The unmodified script is kept beside it as `work/build.sh.pinned`, so
 `diff work/build.sh.pinned work/build.sh` always shows exactly what we changed
@@ -143,8 +148,12 @@ the build, and every accepted line is printed so it can't quietly grow.
 work/verify/config.diff              everything that changed
 work/verify/config.allowed.diff      the accepted part of it
 work/verify/config.significant.diff  must be empty
-work/verify/ksu.diff                 our root block vs the booting reference
+work/verify/ksu.diff                 our root block vs the booting reference (own only)
 ```
+
+The build also refuses to hand you an image it cannot explain: a non-empty
+`config.significant.diff` fails the job, and the artifacts still get uploaded so
+the diff can be read without re-running anything.
 
 ## Rules for changing things
 
