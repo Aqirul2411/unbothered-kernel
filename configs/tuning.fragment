@@ -75,8 +75,14 @@ CONFIG_DAMON_DBGFS=y
 #   su -c 'echo bbrplus > /proc/sys/net/ipv4/tcp_congestion_control'
 #
 # ...which needs root. Same gate as DAMON.
+#
+# DEFAULT_BBRPLUS is the choice entry the same Kconfig block adds. It is
+# deliberately left unset: BBRplus is built and available, but BBRv3 remains the
+# default congestion control. The verifier refused this build until the line was
+# written down here, which is the gate doing its job.
 # ---------------------------------------------------------------------------
 CONFIG_TCP_CONG_BBRPLUS=y
+# CONFIG_DEFAULT_BBRPLUS is not set
 
 # ---------------------------------------------------------------------------
 # REVERTED, do not add back: CONFIG_KASAN off.
