@@ -89,8 +89,11 @@ if [ -n "$ZIP" ] && [ -f "$ZIP" ]; then
 fi
 
 # The recipe's most recent changes: what we did, as opposed to what the kernel
-# does. Three commits is the window a person cares about.
-commits="$(git -C "$ROOT" log -3 --format='%h %s' 2>/dev/null || true)"
+# does. Filtered to the paths that actually reach the build - a commit that only
+# edits docs or this script is not a changelog entry for a kernel.
+commits="$(git -C "$ROOT" log -3 --format='%s' -- \
+  configs/tuning.fragment configs/pins.env configs/identity.env \
+  patches assets scripts/10-build.sh 2>/dev/null || true)"
 
 patches="$(grep -oE 'Applying source patch [^ ]+' "$WORK/build.log" 2>/dev/null \
   | sed 's/Applying source patch //' || true)"
@@ -130,7 +133,7 @@ if [ -n "$ZIP" ] && [ -f "$ZIP" ] && [ -s "$WORK/verify/config.changed" ]; then
   BODY="Unbothered $GITHUB_RUN_NUMBER · $RELEASE
 
 what changed
-$(printf '%s\n' "$commits" | sed 's/^[0-9a-f]* //' | sed 's/^/  · /')
+$(printf '%s\n' "$commits" | sed 's/^/  · /')
 
 config vs the phone: $n lines, significant diff ${sig} bytes
 file   $(basename "$ZIP")  $(( $(stat -c '%s' "$ZIP") / 1000000 )) MB
@@ -144,10 +147,8 @@ rollback: Desktop\\Unbothered\\unbothered-hz-only.zip"
   [ "$code" = "200" ] || say "changelog rejected by Telegram (HTTP $code)"
 
   say "sending $ZIP"
-  code="$(tg_doc "$ZIP" "$RELEASE
-sha256 ${zip_sha:0:16}...
-config.significant.diff"
-)"
+  code="$(tg_doc "$ZIP" "$RELEASE · sha256 ${zip_sha:0:16}… · config diff ${sig} bytes
+flash from recovery, keep the previous zip until it boots twice")"
   [ "$code" = "200" ] || say "document rejected by Telegram (HTTP $code)"
 else
   # A failed build still needs to say something, or the next question is
