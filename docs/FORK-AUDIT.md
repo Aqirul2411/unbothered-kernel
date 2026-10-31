@@ -43,6 +43,7 @@ Two findings worth keeping:
 | item | from | why |
 |---|---|---|
 | `CONFIG_NET_SCH_CAKE=y` | SuiKernel | the only symbol any of the three sets that we do not have. `net/sched/sch_cake.c` is already in our tree and simply not compiled. Built, not default, so nothing changes until something asks for it. |
+| `ANDROID: sched/fair: unlink misfit from cpu overutilized` | Mahiru | +12 −11 in `kernel/sched/fair.c`, Qais Yousef's upstream ACK patch. Hoists the misfit check above the EAS early-out in `find_busiest_group()`, so a task that does not fit its little core is moved off it **before** the whole system is called overutilized. Applied with a 71-line offset, verified with `patch -p1 --dry-run` first. `patches/0003-sched-fair-unlink-misfit-from-overutilized.patch`. |
 
 ## Not taken, and why
 
@@ -54,7 +55,7 @@ Two findings worth keeping:
 | `Mahiru`: no root at all | Mahiru | not a feature. |
 | `mm: Tweak memory pressure for 3/4GB RAM devices` | Mahiru | targets 3–4 GB devices. `marble` has 8–12 GB. Wrong device class, and it changes reclaim behaviour. |
 | `fs: Lower reclaim segment and threshold` | Mahiru | same family as above, no rationale recorded in the commit, and reclaim is where the MGLRU experiment already hurt this phone. |
-| `ANDROID: sched/fair: unlink misfit from cpu overutilized` | Mahiru | genuinely good upstream work, but it edits `kernel/sched/fair.c`, and this tree already carries `CONFIG_SCHED_BORE`. Two scheduler rewrites interacting is exactly the kind of change that boots fine and misbehaves under load — and the person is away, so nobody can report a regression for hours. Candidate for a later, measured build. |
+| `block/blk-throttle: tweak for flash` | Mahiru | `THROTL_QUANTUM 32→64`, SSD slice `HZ/50→HZ/100`, baseline latency `4000→2000`. Only has an effect when blk-throttle is actually limiting a cgroup's IO; there is no measurement of that on this phone, and "tweak" with no rationale is not a reason. |
 | `fs: file_blocker` (Yaroslav Furman) | Mahiru | root-hiding support for userspace tools we do not run; needs a matching userspace to mean anything. |
 | `HZ=300` | SuiKernel | we moved to 250 on purpose and Mahiru's revert agrees. |
 

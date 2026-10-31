@@ -164,6 +164,24 @@ either way, unless something selects cake:
 
     su -c 'tc qdisc replace dev wlan0 root cake'
 
+**And one source patch, the only behaviour change in this batch:**
+`patches/0003-sched-fair-unlink-misfit-from-overutilized.patch`, +12 −11 in
+`kernel/sched/fair.c`. A misfit task — one that does not fit the CPU it is on —
+now gets moved off a little core even when the system is not overutilized. Before,
+the EAS early-out returned first, so the misfit check only ran once the whole
+system was loaded enough to be called overutilized.
+
+Why this one and no other scheduler change: `CONFIG_SCHED_BORE` is already in
+this tree, and stacking a second scheduler rewrite on it is how a kernel boots
+fine and then misbehaves under load. This patch is upstream Android work that
+many shipping kernels carry, it is twelve lines, and it applies to our file with
+a clean offset — not a fork's invention.
+
+**What to watch:** wake latency and battery. The trade is more core migration
+(shorter time-to-completion, a little more big-core time). If the phone feels
+worse or drains faster, delete `patches/0003-*` and rebuild — it is the only
+behaviour change here.
+
 ---
 
 ## Peers analysed
@@ -216,6 +234,6 @@ we already have. Full evidence, symbol by symbol, in
 | Sui custom drivers (`Yamada`, `Moona`, `Sandevistan`, `Tenebrion`, `Inaho`) | reject: in-house drivers in a self-described Experimental kernel, no way to verify, and boot comes first |
 | ReSukiSU root (Aetherium) | reject: the phone runs KernelSU-Next + SUSFS, this is a rebuild for a flavour we do not use |
 | Mahiru `mm` pressure tweaks | reject: written for 3–4 GB devices, ours has 8–12 GB |
-| Mahiru `sched/fair: unlink misfit from cpu overutilized` | **candidate**, later measured batch: real upstream work, but it edits `sched/fair.c` on top of `SCHED_BORE` |
+| Mahiru `sched/fair: unlink misfit from cpu overutilized` | **taken** in batch 3: +12 −11, upstream ACK work, applies cleanly. See the batch note below for the risk this carries |
 
 

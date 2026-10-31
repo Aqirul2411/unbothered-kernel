@@ -1,0 +1,74 @@
+# ANDROID: sched/fair: unlink misfit from cpu overutilized
+#
+# Source: Anything-at-25-00/android_kernel_common_android12-5.10 @ 8a7c81eeb
+# (the Mahiru tree), which is Qais Yousef's ACK patch: +12 -11 lines, one file.
+# Verified against our kernel/sched/fair.c with patch -p1 --dry-run before it was
+# added here; it lands with a 71-line offset because our tree carries 11,944
+# lines in that file and other changes shift everything below the hunk.
+#
+# What it changes: a "misfit" task - one that does not fit the CPU it runs on -
+# is now moved off it even when the system is NOT overutilized. Before, the EAS
+# early-out in find_busiest_group() returned before the misfit check ran, so a
+# heavy task stuck on a little core stayed there until the entire system was
+# loaded enough to be called overutilized. The patch hoists the misfit and
+# "nothing to balance" checks above the EAS block.
+#
+# Why it is worth taking: this is upstream Android work, not a fork's invention,
+# and it is the load-balancer equivalent of a stuck gear. The cost is a little
+# more migration between cores; the usual result is shorter time-to-completion
+# instead of the same work at lower clock for longer.
+#
+# Why it is the ONLY scheduler change taken from the three FORK kernels:
+# CONFIG_SCHED_BORE is already in this tree. Two independent scheduler rewrites
+# is how a kernel boots fine and then misbehaves under load, and nobody is awake
+# to report that today. CAKE (configs/tuning.fragment) is the other take; see
+# docs/FORK-AUDIT.md for what was rejected and why.
+
+diff --git a/kernel/sched/fair.c b/kernel/sched/fair.c
+index bec1c594523c..30a6b5b4b3bc 100644
+--- a/kernel/sched/fair.c
++++ b/kernel/sched/fair.c
+@@ -9628,6 +9628,16 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
+ 	 */
+ 	update_sd_lb_stats(env, &sds);
+ 
++	/* There is no busy sibling group to pull tasks from */
++	if (!sds.busiest)
++		goto out_balanced;
++
++	busiest = &sds.busiest_stat;
++
++	/* Misfit tasks should be dealt with regardless of the avg load */
++	if (busiest->group_type == group_misfit_task)
++		goto force_balance;
++
+ 	if (sched_energy_enabled()) {
+ 		struct root_domain *rd = env->dst_rq->rd;
+ 		int out_balance = 1;
+@@ -9639,17 +9649,6 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
+ 			goto out_balanced;
+ 	}
+ 
+-	local = &sds.local_stat;
+-	busiest = &sds.busiest_stat;
+-
+-	/* There is no busy sibling group to pull tasks from */
+-	if (!sds.busiest)
+-		goto out_balanced;
+-
+-	/* Misfit tasks should be dealt with regardless of the avg load */
+-	if (busiest->group_type == group_misfit_task)
+-		goto force_balance;
+-
+ 	/* ASYM feature bypasses nice load balance check */
+ 	if (busiest->group_type == group_asym_packing)
+ 		goto force_balance;
+@@ -9662,6 +9661,8 @@ static struct sched_group *find_busiest_group(struct lb_env *env)
+ 	if (busiest->group_type == group_imbalanced)
+ 		goto force_balance;
+ 
++	local = &sds.local_stat;
++
+ 	/*
+ 	 * If the local group is busier than the selected busiest group
+ 	 * don't try and pull any tasks.
