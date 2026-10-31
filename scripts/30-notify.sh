@@ -103,6 +103,23 @@ config_changed="$(sed -n '1,28p' "$WORK/verify/config.changed" 2>/dev/null || tr
 # --- send ------------------------------------------------------------------
 # Plain text on purpose: Markdown eats the underscores in symbol names, and a
 # changelog whose CONFIG_HZ_250 becomes italic is a changelog nobody trusts.
+#
+# ASCII on purpose as well. A middle dot and an ellipsis in these strings made
+# Telegram answer "Bad Request: strings must be encoded in UTF-8" - the
+# multi-byte characters do not survive the trip from Git Bash through curl on
+# Windows. So the payload is transliterated or stripped, and anything found is
+# reported rather than silently dropped: a message that quietly loses its
+# characters is worse than one that refuses to send.
+ascii_safe() {
+  local in="$1" out
+  out="$(printf '%s' "$in" | sed 's/\xe2\x80\xa6/.../g; s/\xc2\xb7/|/g; s/\xe2\x80\x94/-/g; s/\xe2\x80\x93/-/g')"
+  out="$(printf '%s' "$out" | LC_ALL=C tr -d '\200-\377')"
+  if [ "$out" != "$in" ]; then
+    say "note: non-ASCII characters were converted or removed for Telegram"
+  fi
+  printf '%s' "$out"
+}
+
 tg_text() {
   if [ -n "$DRY_RUN" ]; then
     printf '\n----- would send -----\n%s\n----------------------\n' "$1" >&2
@@ -112,7 +129,7 @@ tg_text() {
     -X POST "https://api.telegram.org/bot${TOKEN}/sendMessage" \
     --data-urlencode "chat_id=${CHAT}" \
     --data-urlencode "disable_web_page_preview=true" \
-    --data-urlencode "text=$1" 2>/dev/null
+    --data-urlencode "text=$(ascii_safe "$1")" 2>/dev/null
 }
 
 tg_doc() {
@@ -123,17 +140,17 @@ tg_doc() {
   curl -s --max-time 300 -o /dev/null -w '%{http_code}' \
     -F "document=@$1" \
     -F "chat_id=${CHAT}" \
-    -F "caption=$2" \
+    -F "caption=$(ascii_safe "$2")" \
     "https://api.telegram.org/bot${TOKEN}/sendDocument" 2>/dev/null
 }
 
 if [ -n "$ZIP" ] && [ -f "$ZIP" ] && [ -s "$WORK/verify/config.changed" ]; then
   sig="$(stat -c '%s' "$WORK/verify/config.significant.diff" 2>/dev/null || echo '?')"
   n="$(grep -cE '^[-+](CONFIG_|# CONFIG_)' "$WORK/verify/config.changed" 2>/dev/null || echo '?')"
-  BODY="Unbothered $GITHUB_RUN_NUMBER · $RELEASE
+  BODY="Unbothered $GITHUB_RUN_NUMBER | $RELEASE
 
 what changed
-$(printf '%s\n' "$commits" | sed 's/^/  · /')
+$(printf '%s\n' "$commits" | sed 's/^/  | /')
 
 config vs the phone: $n lines, significant diff ${sig} bytes
 file   $(basename "$ZIP")  $(( $(stat -c '%s' "$ZIP") / 1000000 )) MB
@@ -147,7 +164,7 @@ rollback: Desktop\\Unbothered\\unbothered-hz-only.zip"
   [ "$code" = "200" ] || say "changelog rejected by Telegram (HTTP $code)"
 
   say "sending $ZIP"
-  code="$(tg_doc "$ZIP" "$RELEASE · sha256 ${zip_sha:0:16}… · config diff ${sig} bytes
+  code="$(tg_doc "$ZIP" "$RELEASE | sha256 ${zip_sha:0:16}... | config diff ${sig} bytes
 flash from recovery, keep the previous zip until it boots twice")"
   [ "$code" = "200" ] || say "document rejected by Telegram (HTTP $code)"
 else
