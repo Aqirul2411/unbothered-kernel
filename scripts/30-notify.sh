@@ -120,25 +120,19 @@ tg_doc() {
 }
 
 if [ -n "$ZIP" ] && [ -f "$ZIP" ] && [ -s "$WORK/verify/config.changed" ]; then
-  BODY="Unbothered - build $GITHUB_RUN_NUMBER
+  sig="$(stat -c '%s' "$WORK/verify/config.significant.diff" 2>/dev/null || echo '?')"
+  n="$(grep -cE '^[-+](CONFIG_|# CONFIG_)' "$WORK/verify/config.changed" 2>/dev/null || echo '?')"
+  BODY="Unbothered $GITHUB_RUN_NUMBER · $RELEASE
 
-kernel   $RELEASE
-file     $zip_line
-sha256   $zip_sha
+what changed
+$(printf '%s\n' "$commits" | sed 's/^[0-9a-f]* //' | sed 's/^/  · /')
 
-recipe (last 3 commits)
-$(printf '%s\n' "$commits" | sed 's/^/  /')
+config vs the phone: $n lines, significant diff ${sig} bytes
+file   $(basename "$ZIP")  $(( $(stat -c '%s' "$ZIP") / 1000000 )) MB
+sha256 $zip_sha
 
-source patches
-$(if [ -n "$patches" ]; then printf '%s\n' "$patches" | sed 's/^/  /'; else echo "  none"; fi)
-
-config, compared with the kernel on the phone
-$(if [ -n "$config_changed" ]; then printf '%s\n' "$config_changed" | sed 's/^/  /'; else echo "  nothing significant"; fi)
-
-verifier: config.significant.diff $(stat -c '%s' "$WORK/verify/config.significant.diff" 2>/dev/null || echo '?') bytes, ksu block $(stat -c '%s' "$WORK/verify/ksu-marble-working.config.diff" 2>/dev/null || echo '?') bytes
-
-Flash it, reboot twice, and watch wake latency and idle drain.
-Rollback: Desktop\\Unbothered\\unbothered-hz-only.zip"
+flash, reboot twice, watch wake latency and idle drain.
+rollback: Desktop\\Unbothered\\unbothered-hz-only.zip"
 
   say "sending changelog"
   code="$(tg_text "$BODY")"
