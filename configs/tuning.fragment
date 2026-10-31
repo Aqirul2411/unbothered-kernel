@@ -85,6 +85,27 @@ CONFIG_TCP_CONG_BBRPLUS=y
 # CONFIG_DEFAULT_BBRPLUS is not set
 
 # ---------------------------------------------------------------------------
+# 5. CAKE: build the scheduler, keep fq_codel as the default queue.
+#
+# Taken from SuiKernel (5.10.264), the only one of the three kernels dropped in
+# Desktop\Arkael\FORK that sets a symbol we do not have. Their config has
+# NET_SCH_CAKE=y and DEFAULT_NET_SCH="cake"; ours has the source file sitting
+# unused in net/sched/sch_cake.c because the symbol was never enabled.
+#
+# Only the build half is taken. Their default is cake, and making cake the
+# default qdisc sends every wifi packet through a heavier shaper on the CPU -
+# a cost we have no measurement for. fq_codel stays default; cake is one line
+# away for whoever wants it:
+#
+#   su -c 'tc qdisc replace dev wlan0 root cake'
+#
+# No behaviour changes until something selects it, same gate as DAMON and
+# BBRplus. See docs/FORK-AUDIT.md for what the other two kernels had and why
+# none of it was taken.
+# ---------------------------------------------------------------------------
+CONFIG_NET_SCH_CAKE=y
+
+# ---------------------------------------------------------------------------
 # REVERTED, do not add back: CONFIG_KASAN off.
 #
 # Reason: the build with KASAN off **hangs this phone at the POCO logo**, with no
