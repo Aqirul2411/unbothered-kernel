@@ -106,6 +106,27 @@ CONFIG_TCP_CONG_BBRPLUS=y
 CONFIG_NET_SCH_CAKE=y
 
 # ---------------------------------------------------------------------------
+# 6. Power-efficient workqueues: let unbound work run where a core is awake.
+#
+# Unset in our config and in the phone's. What it does: workqueues that opt in
+# with WQ_POWER_EFFICIENT - and the two system-level ones - stop being pinned to
+# the CPU that queued the work and are handed to the scheduler, which can pick a
+# core that is already awake instead of waking an idle one.
+#
+# Why it matters on a phone: waking a sleeping core for a short work item pays
+# the wake cost and the idle-state exit for work that a busy core could absorb.
+# LWN's write-up of the feature quotes "up to 15% for some use cases" on ARM and
+# Android, which is why it is worth a flash - not because 15% is a number to
+# expect here, but because it is an idle-drain lever we have never tested.
+#
+# The cost: a work item may run on a different CPU each time, so it loses warm
+# cache. That is the trade, and it is why this goes in alone.
+#
+# Revert: delete this line. It cannot affect boot either way.
+# ---------------------------------------------------------------------------
+CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+
+# ---------------------------------------------------------------------------
 # REVERTED, do not add back: CONFIG_KASAN off.
 #
 # Reason: the build with KASAN off **hangs this phone at the POCO logo**, with no
