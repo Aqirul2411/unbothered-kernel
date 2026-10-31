@@ -80,6 +80,9 @@ for cand in "$WORK/unbothered.zip" "$(ls -1t "$WORK"/*.zip 2>/dev/null | head -n
 done
 RELEASE_FILE="$WORK/ksrc/include/config/kernel.release"
 RELEASE="$(cat "$RELEASE_FILE" 2>/dev/null || echo "$EXPECTED_LINUX_VERSION-$KERNEL_NAME/${KERNEL_SHA:0:9}")"
+# The name the person recognises: "Unbothered 5.10.272". The run number and the
+# full localversion are still in the body, but the headline is the kernel.
+VER="${EXPECTED_LINUX_VERSION:-$RELEASE}"
 
 zip_line="not produced"
 zip_sha=""
@@ -147,7 +150,7 @@ tg_doc() {
 if [ -n "$ZIP" ] && [ -f "$ZIP" ] && [ -s "$WORK/verify/config.changed" ]; then
   sig="$(stat -c '%s' "$WORK/verify/config.significant.diff" 2>/dev/null || echo '?')"
   n="$(grep -cE '^[-+](CONFIG_|# CONFIG_)' "$WORK/verify/config.changed" 2>/dev/null || echo '?')"
-  BODY="Unbothered $GITHUB_RUN_NUMBER | $RELEASE
+  BODY="Unbothered $VER | build $GITHUB_RUN_NUMBER
 
 what changed
 $(printf '%s\n' "$commits" | sed 's/^/  | /')
@@ -157,14 +160,14 @@ file   $(basename "$ZIP")  $(( $(stat -c '%s' "$ZIP") / 1000000 )) MB
 sha256 $zip_sha
 
 flash, reboot twice, watch wake latency and idle drain.
-rollback: Desktop\\Unbothered\\unbothered-hz-only.zip"
+rollback: the previous zip in Desktop\\Unbothered"
 
   say "sending changelog"
   code="$(tg_text "$BODY")"
   [ "$code" = "200" ] || say "changelog rejected by Telegram (HTTP $code)"
 
   say "sending $ZIP"
-  code="$(tg_doc "$ZIP" "$RELEASE | sha256 ${zip_sha:0:16}... | config diff ${sig} bytes
+  code="$(tg_doc "$ZIP" "Unbothered $VER | sha256 ${zip_sha:0:16}... | config diff ${sig} bytes
 flash from recovery, keep the previous zip until it boots twice")"
   [ "$code" = "200" ] || say "document rejected by Telegram (HTTP $code)"
 else
