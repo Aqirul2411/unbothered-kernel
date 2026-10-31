@@ -87,6 +87,11 @@ jobs:
       - name: Collect
         if: always()
         run: |
+          # Rewrite the zip with the writer that is known to flash on this
+          # recovery, before anything is copied to artifacts/. Deliberately not
+          # `|| true`: if the repack fails, the build must not quietly ship the
+          # archive format the phone rejected.
+          ./scripts/25-repack.sh
           mkdir -p artifacts
           cp -v work/out/arch/arm64/boot/Image artifacts/ 2>/dev/null || true
           cp -v work/*.zip artifacts/ 2>/dev/null || true
