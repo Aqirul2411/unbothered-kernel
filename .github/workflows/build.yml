@@ -112,3 +112,18 @@ jobs:
           path: artifacts/
           if-no-files-found: warn
           retention-days: 30
+
+      # The changelog and the zip, to Telegram. Deliberately last and
+      # `always()`: a failed build has to say why, or the next question is
+      # "did CI even run?". It sends the failure only when there is no verified
+      # zip on disk, so a green build can never be announced with a red body.
+      #
+      # The credentials are secrets and never enter the tree. TELEGRAM_CHAT_ID
+      # is optional: without it the script asks Telegram who last messaged the
+      # bot, so setup is "create bot, send it hi, add the token".
+      - name: Notify
+        if: always()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: ./scripts/30-notify.sh
