@@ -131,6 +131,8 @@ no swap".
 
 ---
 
+---
+
 ### Batch 2 - HZ=250, one line
 
 **Built and verified** (run 41054425557): accepted diff is the rename, `HZ 300 -> 250`
@@ -147,6 +149,44 @@ turned a five-minute bisect into a phone stuck at the logo.
 
 _Device result: pending flash. Revert if idle drain moves less than the noise
 floor (~0.2 %/h), rather than carrying a change that did nothing._
+
+---
+
+---
+
+### Batch 3 - CAKE compiled in, still not the default
+
+`CONFIG_NET_SCH_CAKE=y` only. `net/sched/sch_cake.c` has been in this tree the
+whole time with no symbol to build it; SuiKernel's config is the only place it
+turned up enabled. Compiling a scheduler in that nothing selects cannot change
+how the phone runs, so this batch is safe to carry while batch 2 is still being
+measured — but it is also expected to be **inert**, which is why it is recorded
+as a capability rather than a win.
+
+Reverting is one line in `configs/tuning.fragment` and changes nothing observable
+either way, unless something selects cake:
+
+    su -c 'tc qdisc replace dev wlan0 root cake'
+
+**And one source patch, the only behaviour change in this batch:**
+`patches/0003-sched-fair-unlink-misfit-from-overutilized.patch`, +12 −11 in
+`kernel/sched/fair.c`. A misfit task — one that does not fit the CPU it is on —
+now gets moved off a little core even when the system is not overutilized. Before,
+the EAS early-out returned first, so the misfit check only ran once the whole
+system was loaded enough to be called overutilized.
+
+Why this one and no other scheduler change: `CONFIG_SCHED_BORE` is already in
+this tree, and stacking a second scheduler rewrite on it is how a kernel boots
+fine and then misbehaves under load. This patch is upstream Android work that
+many shipping kernels carry, it is twelve lines, and it applies to our file with
+a clean offset — not a fork's invention.
+
+**What to watch:** wake latency and battery. The trade is more core migration
+(shorter time-to-completion, a little more big-core time). If the phone feels
+worse or drains faster, delete `patches/0003-*` and rebuild — it is the only
+behaviour change here.
+
+---
 
 ---
 
@@ -188,37 +228,24 @@ result stays readable.
 
 ---
 
-### Batch 3 - CAKE compiled in, still not the default
+---
 
-`CONFIG_NET_SCH_CAKE=y` only. `net/sched/sch_cake.c` has been in this tree the
-whole time with no symbol to build it; SuiKernel's config is the only place it
-turned up enabled. Compiling a scheduler in that nothing selects cannot change
-how the phone runs, so this batch is safe to carry while batch 2 is still being
-measured — but it is also expected to be **inert**, which is why it is recorded
-as a capability rather than a win.
+### Batch 5 - power-efficient workqueues
 
-Reverting is one line in `configs/tuning.fragment` and changes nothing observable
-either way, unless something selects cake:
+`CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y`, the candidate named in batch 4.
 
-    su -c 'tc qdisc replace dev wlan0 root cake'
+Unset in our config and in the phone's, so it has never been tested here. The
+feature stops opting-in workqueues — and the two system-level ones — from being
+pinned to the CPU that queued the work; the scheduler chooses, and it can choose
+a core that is already awake. For a phone the point is the short work item that
+currently pays a wake-up and an idle-state exit because the wrong CPU got it.
 
-**And one source patch, the only behaviour change in this batch:**
-`patches/0003-sched-fair-unlink-misfit-from-overutilized.patch`, +12 −11 in
-`kernel/sched/fair.c`. A misfit task — one that does not fit the CPU it is on —
-now gets moved off a little core even when the system is not overutilized. Before,
-the EAS early-out returned first, so the misfit check only ran once the whole
-system was loaded enough to be called overutilized.
+LWN's article on the feature quotes "up to 15% for some use cases" on ARM and
+Android. That is the reason to test it, not a number to expect.
 
-Why this one and no other scheduler change: `CONFIG_SCHED_BORE` is already in
-this tree, and stacking a second scheduler rewrite on it is how a kernel boots
-fine and then misbehaves under load. This patch is upstream Android work that
-many shipping kernels carry, it is twelve lines, and it applies to our file with
-a clean offset — not a fork's invention.
-
-**What to watch:** wake latency and battery. The trade is more core migration
-(shorter time-to-completion, a little more big-core time). If the phone feels
-worse or drains faster, delete `patches/0003-*` and rebuild — it is the only
-behaviour change here.
+The trade is stated up front: work that moves CPU loses warm cache, so this can
+cost responsiveness in exchange for energy. That is exactly what a one-change
+flash is for — if it feels worse, deleting one line reverts it.
 
 ---
 
