@@ -101,6 +101,23 @@ documentation and the measurements around the series:
 So the measurement that matters is not overnight drain, it is: does the phone
 stop evicting your background apps, and does it feel slower when memory is full.
 
+## Measuring it: debugfs, and a Kconfig trap
+
+`CONFIG_DEBUG_FS=y` is on, so the backport registers two nodes unconditionally at
+`late_initcall(init_lru_gen)`:
+
+| node | mode | what it is |
+|---|---|---|
+| `/sys/kernel/debug/lru_gen` | 0644 | live per-memcg view; writable, can force aging |
+| `/sys/kernel/debug/lru_gen_full` | 0444 | full generation detail, read-only |
+
+**The trap:** `CONFIG_LRU_GEN_STATS` exists in `mm/Kconfig` ("Full stats for
+debugging"), which reads like the switch to turn counters on. It is not:
+`grep -c LRU_GEN_STATS mm/vmscan.c` returns **0**. The symbol is dead in this
+backport — a build with it would compile, verify, and change nothing. The
+debugfs nodes above are registered regardless. Anyone "enabling stats" here is
+enabling a placebo.
+
 ## Reverting
 
 Flash the main-line `unbothered.zip` from `Desktop\Unbothered\` and the
