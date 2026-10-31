@@ -127,6 +127,37 @@ CONFIG_NET_SCH_CAKE=y
 CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
 
 # ---------------------------------------------------------------------------
+# 7. MGLRU - compiled in, OFF by default. EXPERIMENTAL BRANCH ONLY.
+#
+# This section does not exist on main. It is on branch experimental-mglru, which
+# builds from a merge of Arkael's mglru-5.10 branch (Google's BACKPORT series
+# plus the crash fixes that came after it) into our pinned tree.
+#
+# Why off by default, when the point was to test it:
+#
+#   CONFIG_LRU_GEN_ENABLED=n leaves the legacy LRU in charge at boot, and the
+#   backport exposes /sys/kernel/mm/lru_gen/enabled to switch generations on at
+#   runtime. A bad backport then costs a power cycle: nothing persists, the next
+#   boot is the legacy LRU again. An earlier MGLRU attempt on this hardware hung
+#   with no log - this is the only shape where that failure is survivable.
+#
+# The honest limit of that safety: the backport also touches mm_types.h,
+# memcontrol.h and mmzone.h, which are initialised before any toggle is read. If
+# the merge broke a core structure, the switch does not save you. That is why
+# this is a separate branch and a separate zip, not a batch on main.
+#
+# After flashing, to turn it on:
+#
+#   su -c 'echo 7 > /sys/kernel/mm/lru_gen/enabled'    # all features
+#   su -c 'cat /sys/kernel/mm/lru_gen/enabled'         # read back
+#   su -c 'echo 0 > /sys/kernel/mm/lru_gen/enabled'    # back to legacy LRU
+#
+# (0x7 enables the four feature bits the backport documents.)
+# ---------------------------------------------------------------------------
+CONFIG_LRU_GEN=y
+# CONFIG_LRU_GEN_ENABLED is not set
+
+# ---------------------------------------------------------------------------
 # REVERTED, do not add back: CONFIG_KASAN off.
 #
 # Reason: the build with KASAN off **hangs this phone at the POCO logo**, with no
