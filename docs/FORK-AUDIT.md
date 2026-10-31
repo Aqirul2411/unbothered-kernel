@@ -56,6 +56,36 @@ Two findings worth keeping:
 | `mm: Tweak memory pressure for 3/4GB RAM devices` | Mahiru | targets 3–4 GB devices. `marble` has 8–12 GB. Wrong device class, and it changes reclaim behaviour. |
 | `fs: Lower reclaim segment and threshold` | Mahiru | same family as above, no rationale recorded in the commit, and reclaim is where the MGLRU experiment already hurt this phone. |
 | `block/blk-throttle: tweak for flash` | Mahiru | `THROTL_QUANTUM 32→64`, SSD slice `HZ/50→HZ/100`, baseline latency `4000→2000`. Only has an effect when blk-throttle is actually limiting a cgroup's IO; there is no measurement of that on this phone, and "tweak" with no rationale is not a reason. |
+
+## Pandora `5.10.247` (Telegram, 2026-11-01)
+
+`Kernel-Pandora-5.10-26w08d-120358.zip`. Audited by the same method: `Image.gz`
+decompressed, `IKCFG` extracted, 5,351 symbols read.
+
+```
+version   5.10.247-android12-9-Pandora-26w08d    (25 stable releases behind us)
+root      none - CONFIG_KSU absent, no SUSFS
+sched     CONFIG_SCHED_BORE absent
+memory    identical to ours (no MGLRU, no zram built in)
+tcp       default cubic, BBR and BBR3 not even compiled
+idle      no DAMON
+build     full LTO instead of our thin LTO
+HZ        250
+installer refuses anything below 5.10.198 or below Android 14
+```
+
+Nothing to take. It is the same story as the three zips in `Desktop\Arkael\FORK`:
+an older tree, rootless, without BORE, and without the networking stack we build.
+Its one difference — full LTO — buys nothing measurable at runtime and costs a
+much heavier build; thin LTO is what AOSP and GKI ship.
+
+The binary advertises two knobs of its own, `pandora_config` and `pandora_kfas`,
+with no source, no documentation and nothing in the config to describe them.
+That is not a feature to fork; it is a name.
+
+**Fifth independent confirmation of `HZ=250`**, which is now the most agreed-on
+single setting in this project: SilverCore, GrayRavens, Mahiru, SuiKernel and
+Pandora — five unrelated trees, one choice.
 | `fs: file_blocker` (Yaroslav Furman) | Mahiru | root-hiding support for userspace tools we do not run; needs a matching userspace to mean anything. |
 | `HZ=300` | SuiKernel | we moved to 250 on purpose and Mahiru's revert agrees. |
 
