@@ -150,6 +150,44 @@ floor (~0.2 %/h), rather than carrying a change that did nothing._
 
 ---
 
+### Batch 4 - schedutil drops frequency without idling
+
+**The gap in batch 3:** TEO decides when the CPU goes to sleep. Nothing so far
+changed what clock it comes back to when it cannot sleep — and that is the
+screen-on cost, which is where a phone spends most of its energy.
+
+`patches/0004-cpufreq-schedutil-drop-without-idling.patch` removes the guard in
+`schedutil` that refuses to lower a single-CPU policy's frequency unless that CPU
+has entered idle since the last update. Sultan Alsawaf's argument, which is hard
+to argue with: the clock is already gated in the shallowest idle state, so
+waiting for an idle call before slowing down is putting the cart before the
+horse. A rate limiter on frequency changes already exists; the heuristic is
+redundant. For long-running low-compute work — scrolling, video — it holds the
+clock higher than the work needs.
+
+His measurement on a Pixel 8, not ours: **7.5% lower CPU power** in a browsing
+workload (270 mW → 250 mW), no visible performance loss.
+
+Checked before taking it: `CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y`, so this is
+the governor the phone actually runs. A patch against a governor nobody uses is
+a comment.
+
+Cut against our own `kernel/sched/cpufreq_schedutil.c` (their commit is +1 −30
+but two of its hunks do not fit our file), applied and re-read after applying:
+29 lines removed, no leftover references, `sugov_update_single()` still coherent.
+
+**What to watch:** unevenness in scrolling or video. Interactions are the risk,
+not the mechanism.
+
+**Known but not taken yet:** `CONFIG_WQ_POWER_EFFICIENT_DEFAULT` is unset in our
+config and in the phone's. Upstream describes it as letting unbound work run on
+a core that is already awake instead of waking an idle one; LWN quotes "up to
+15% for some use cases" on ARM. It is a real idle-drain lever, and it is a
+one-line config change for a later batch — kept out of this one so the schedutil
+result stays readable.
+
+---
+
 ### Batch 3 - CAKE compiled in, still not the default
 
 `CONFIG_NET_SCH_CAKE=y` only. `net/sched/sch_cake.c` has been in this tree the

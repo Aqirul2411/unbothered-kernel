@@ -1,0 +1,88 @@
+# cpufreq: schedutil: allow a single-CPU policy to drop frequency without idling
+#
+# Source: kerneltoast (Sultan Alsawaf), via the Mahiru tree @ 33bdaefe. That
+# commit is +1 -30; this one is a little larger because it is cut against OUR
+# file, whose schedutil differs from theirs (two of their hunks do not fit).
+#
+# What it removes: the guard that refuses to lower a single-CPU policy's
+# frequency unless that CPU has entered idle since the last update. The
+# argument against the guard, from the upstream author:
+#
+#   A CPU's clock is gated at even the shallowest idle state, so waiting for an
+#   idle call before reducing frequency is putting the cart before the horse.
+#   For long-running workloads with low compute needs - exactly what a phone
+#   does while scrolling or playing video - requiring an idle call since the
+#   last update keeps the clock higher than the work needs. There is already a
+#   rate limiter on frequency changes; the heuristic is unnecessary.
+#
+# Measured claim (Pixel 8, their numbers, not ours): 7.5% lower CPU power in a
+# browsing workload, 270 mW -> 250 mW, with no visible performance loss.
+#
+# Why it is worth a flash here: our idle governor work (TEO) changed when the
+# CPU goes to sleep. This changes what clock it returns to when it cannot. Those
+# are different levers, and this one applies while the screen is on.
+#
+# What to watch: interactions are the risk, not the mechanism. If scrolling or
+# video starts to feel uneven, this is the suspect, and deleting this file
+# reverts it.
+
+diff --git a/kernel/sched/cpufreq_schedutil.c b/kernel/sched/cpufreq_schedutil.c
+--- a/kernel/sched/cpufreq_schedutil.c
++++ b/kernel/sched/cpufreq_schedutil.c
+@@ -58,10 +58,6 @@
+ 	unsigned long		bw_dl;
+ 	unsigned long		max;
+ 
+-	/* The field below is for single-CPU policies only: */
+-#ifdef CONFIG_NO_HZ_COMMON
+-	unsigned long		saved_idle_calls;
+-#endif
+ };
+ 
+ static DEFINE_PER_CPU(struct sugov_cpu, sugov_cpu);
+@@ -457,19 +453,6 @@
+ 		sg_cpu->util = boost;
+ }
+ 
+-#ifdef CONFIG_NO_HZ_COMMON
+-static bool sugov_cpu_is_busy(struct sugov_cpu *sg_cpu)
+-{
+-	unsigned long idle_calls = tick_nohz_get_idle_calls_cpu(sg_cpu->cpu);
+-	bool ret = idle_calls == sg_cpu->saved_idle_calls;
+-
+-	sg_cpu->saved_idle_calls = idle_calls;
+-	return ret;
+-}
+-#else
+-static inline bool sugov_cpu_is_busy(struct sugov_cpu *sg_cpu) { return false; }
+-#endif /* CONFIG_NO_HZ_COMMON */
+-
+ /*
+  * Make sugov_should_update_freq() ignore the rate limit when DL
+  * has increased the utilization.
+@@ -485,7 +468,6 @@
+ {
+ 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_util);
+ 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
+-	unsigned int cached_freq = sg_policy->cached_raw_freq;
+ 	unsigned int next_f;
+ 
+ 	sugov_iowait_boost(sg_cpu, time, flags);
+@@ -500,17 +482,6 @@
+ 	sugov_iowait_apply(sg_cpu, time);
+ 
+ 	next_f = get_next_freq(sg_policy, sg_cpu->util, sg_cpu->max);
+-	/*
+-	 * Do not reduce the frequency if the CPU has not been idle
+-	 * recently, as the reduction is likely to be premature then.
+-	 */
+-	if (sugov_cpu_is_busy(sg_cpu) && next_f < sg_policy->next_freq) {
+-		next_f = sg_policy->next_freq;
+-
+-		/* Restore cached freq as next_freq has changed */
+-		sg_policy->cached_raw_freq = cached_freq;
+-	}
+-
+ 	/*
+ 	 * This code runs under rq->lock for the target CPU, so it won't run
+ 	 * concurrently on two different CPUs for the same target and it is not
