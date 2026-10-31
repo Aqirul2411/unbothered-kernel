@@ -150,6 +150,22 @@ floor (~0.2 %/h), rather than carrying a change that did nothing._
 
 ---
 
+### Batch 3 - CAKE compiled in, still not the default
+
+`CONFIG_NET_SCH_CAKE=y` only. `net/sched/sch_cake.c` has been in this tree the
+whole time with no symbol to build it; SuiKernel's config is the only place it
+turned up enabled. Compiling a scheduler in that nothing selects cannot change
+how the phone runs, so this batch is safe to carry while batch 2 is still being
+measured — but it is also expected to be **inert**, which is why it is recorded
+as a capability rather than a win.
+
+Reverting is one line in `configs/tuning.fragment` and changes nothing observable
+either way, unless something selects cake:
+
+    su -c 'tc qdisc replace dev wlan0 root cake'
+
+---
+
 ## Peers analysed
 
 Two other kernels' embedded configs were extracted and read, because a config
@@ -184,5 +200,22 @@ What it does inform:
 
 **Lesson:** a famous kernel is one data point, not a template. GrayRavens also
 ships `DEBUG_INFO=y`, which is nobody's idea of a performance decision.
+
+### SuiKernel `5.10.264`, Aetherium `5.10.269`, Mahiru `5.10.265` (2026)
+
+Three zips handed over as fork candidates. All three are **older than the tree
+we build** (5.10.272), and their scheduling, memory, idle and build blocks are
+identical to ours or a subset of it. None of them sets `CONFIG_SCHED_BORE`, which
+we already have. Full evidence, symbol by symbol, in
+[FORK-AUDIT.md](FORK-AUDIT.md).
+
+| theirs | verdict for us |
+|---|---|
+| `DEFAULT_NET_SCH="cake"` (Sui) | reject here, as above: CPU per packet. But `NET_SCH_CAKE=y` **is** taken below — built, not default |
+| `HZ=250` (Mahiru reverted 300 → 250) | already taken; fourth independent vote for 250 |
+| Sui custom drivers (`Yamada`, `Moona`, `Sandevistan`, `Tenebrion`, `Inaho`) | reject: in-house drivers in a self-described Experimental kernel, no way to verify, and boot comes first |
+| ReSukiSU root (Aetherium) | reject: the phone runs KernelSU-Next + SUSFS, this is a rebuild for a flavour we do not use |
+| Mahiru `mm` pressure tweaks | reject: written for 3–4 GB devices, ours has 8–12 GB |
+| Mahiru `sched/fair: unlink misfit from cpu overutilized` | **candidate**, later measured batch: real upstream work, but it edits `sched/fair.c` on top of `SCHED_BORE` |
 
 
