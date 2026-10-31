@@ -72,7 +72,12 @@ fi
 say "chat $CHAT"
 
 # --- what actually got built ----------------------------------------------
-ZIP="$(ls -1t "$WORK"/*.zip 2>/dev/null | head -n1 || true)"
+# unbothered.zip is the predictable name CI makes; the versioned one is what the
+# build itself calls it. Prefer the predictable name when both are present.
+ZIP=""
+for cand in "$WORK/unbothered.zip" "$(ls -1t "$WORK"/*.zip 2>/dev/null | head -n1 || true)"; do
+  if [ -n "$cand" ] && [ -f "$cand" ]; then ZIP="$cand"; break; fi
+done
 RELEASE_FILE="$WORK/ksrc/include/config/kernel.release"
 RELEASE="$(cat "$RELEASE_FILE" 2>/dev/null || echo "$EXPECTED_LINUX_VERSION-$KERNEL_NAME/${KERNEL_SHA:0:9}")"
 
