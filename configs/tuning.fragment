@@ -128,35 +128,28 @@ CONFIG_NET_SCH_CAKE=y
 CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
 
 # ---------------------------------------------------------------------------
-# 7. MGLRU: on at boot, all capabilities.
+# 7. MGLRU: REVERTED, do not add back without a device test.
 #
-# The tree carries Google's multi-gen LRU backport as a merge. These two symbols
-# are the only config it needs: LRU_GEN_ENABLED makes the capabilities statically
-# true at boot, so no runtime transition ever runs.
+# It was merged (35a478789) and removed again (4a8a27860). Two configurations,
+# two failures, and they bracket the feature:
 #
-# Why at boot and never at runtime: enabling MGLRU on a loaded phone calls
-# lru_gen_change_state(), which moves every page already on the LRU into the
-# generation lists while taking pgdat->lru_lock in batches. That is a stall long
-# enough to freeze the screen, with no panic and no reboot. At boot the same
-# migration is trivial because the lists are nearly empty.
+#   b63ed8289  core only, page-table walks disabled at boot: boots and works,
+#              then goes sluggish after hours of uptime, because aging advances
+#              the generation counter without scanning anything (vmscan.c
+#              ~line 3957) and reclaim evicts in allocation order.
 #
-# Do NOT repeat the first attempt, which booted core-only and disabled the two
-# page-table-walk capabilities "for safety". They are not an optional extra: with
-# the walk off, aging advances without scanning a page (vmscan.c line 3957), so
-# reclaim evicts in allocation order and the phone goes sluggish after hours of
-# use. Core-only is the broken configuration, not the cautious one.
+#   41fac00aa  core plus walks: hangs right after the lock screen, reproducibly,
+#              twice. No log was captured, so the mechanism is unknown; the walk
+#              is the only difference from a build that boots.
 #
-#   su -c 'cat  /sys/kernel/mm/lru_gen/enabled'         # expect 0x0003
-#   su -c 'echo 0 > /sys/kernel/mm/lru_gen/enabled'     # off, but see above:
-#                                                       # this migrates too, so
-#                                                       # only right after boot
+# So there is no safe half: the capability bitmap has exactly these two sides.
+# The experiment stays addressable as tag mglru-walks-hang and branch
+# mglru-experiment. Config symbols below are deliberately absent - the tree no
+# longer has mm/lru_gen.c, and asking for LRU_GEN there is a warning, not a knob.
 #
-# Measurement lives in debugfs, not in a config symbol: CONFIG_LRU_GEN_STATS is
-# declared in Kconfig and referenced zero times in mm/vmscan.c, so "enabling
-# stats" would be a placebo. The real interface is /sys/kernel/debug/lru_gen_full.
+# What would change the verdict: a backport whose walk path is tested on a
+# vendor 5.10 tree with a serial console, on a spare device.
 # ---------------------------------------------------------------------------
-CONFIG_LRU_GEN=y
-CONFIG_LRU_GEN_ENABLED=y
 
 # ---------------------------------------------------------------------------
 # REVERTED, do not add back: CONFIG_KASAN off.

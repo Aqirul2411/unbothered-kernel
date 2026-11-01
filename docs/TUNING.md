@@ -22,7 +22,19 @@ Rules for this file:
 
 **Result on this phone:** hangs, then the device restarts itself.
 
-**Verdict: do not retry.** Not "retry carefully" — the failure mode is a hang,
+**Verdict: do not retry.**
+
+> **Superseded 2026-11-02.** The verdict above was written against a *runtime*
+> enable, and the hang it describes is `lru_gen_change_state()` migrating every
+> resident page under `pgdat->lru_lock` - not a bug in the merge. Enabling at
+> boot removes that transition entirely, and MGLRU has since merged into
+> `unbothered-5.10` cleanly (`35a478789`). The first attempt at a cautious
+> middle ground, `b63ed8289` with the page-table walks disabled, reproduced a
+> quieter version of the same verdict: fine for hours, then sluggish, because
+> reclaim without walks evicts in allocation order. Current state, the code
+> evidence, and the readback that would kill the experiment for good are in
+> [MGLRU.md](MGLRU.md). This entry is kept because "MGLRU hung this phone" is
+> still true of the way it was first tried. Not "retry carefully" — the failure mode is a hang,
 which means no log and no way to see what went wrong, and a restart loop on a
 phone that is someone's daily driver.
 

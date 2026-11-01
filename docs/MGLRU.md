@@ -64,6 +64,27 @@ there is free memory, so a FIFO victim policy costs nothing until the caches
 fill, and then every reclaim pass picks a page that is in use, which faults
 straight back in.
 
+The user's own description, which is worth keeping because it is the shape of
+every reclaim-quality bug: idle the phone, then pick it up, and app opens take
+seconds and scrolling stutters, until a reboot. No heat involved.
+
+**Fix, `41fac00aa`:** that late_initcall is deleted. `mm/vmscan.c` is back to the
+merge commit's version, where `CONFIG_LRU_GEN_ENABLED=y` means
+`DEFINE_STATIC_KEY_ARRAY_TRUE` - every capability on at boot, aging walks
+included. Nothing turns anything on at runtime, so the `change_state()` stall
+still never happens.
+
+Expected readback is `0x0003`: core and walk. This tree has no
+`CONFIG_ARCH_HAS_NONLEAF_PMD_YOUNG`, so the third bit cannot appear in the
+mapping at all.
+
+**A readback of `0x0001` after that fix would be decisive in the other
+direction.** `show_enabled()` masks the walk bit with `arch_has_hw_pte_young()`,
+which on arm64 is `cpu_has_hw_af()`. If the walk bit refuses to appear, the SoC
+does not offer a hardware accessed bit, the walk is not available, MGLRU cannot
+be better than the LRU here, and the right move is to drop MGLRU rather than keep
+paying 3000 lines of merge conflict for nothing.
+
 ## Why it is on at boot
 
 Enabling core at runtime calls `lru_gen_change_state(true)`, which walks every
@@ -109,10 +130,15 @@ echo 1000 > /sys/kernel/mm/lru_gen/min_ttl_ms
 | merges cleanly into 5.10.272 | verified, twice |
 | boots with core on | verified on device, `0x0001` |
 | survives an hour | verified |
-| better than the legacy LRU for a full day | **not verified, and now contradicted once** |
-| walks are safe on this vendor tree | untested |
+| better than the legacy LRU for a full day | **contradicted once**: sluggish after hours on `b63ed8289`, regardless of whether MGLRU was the newest thing on the phone |
+| walks are safe on this vendor tree | untested - `41fac00aa` is the first build that runs them |
 
-The next honest test is `0x7` at boot - core *and* walks - because core alone is
-a configuration whose only distinguishing feature is that it drops the
-information the algorithm needs. If that bootloops or misbehaves, MGLRU goes
-back to `mglru-experiment` and stays there.
+The next honest test is the one `41fac00aa` sets up: core *and* walks at boot,
+because core alone is a configuration whose only distinguishing feature is that
+it drops the information the algorithm needs.
+
+If it is still sluggish, the honest fallback is not another MGLRU variant. It is
+`d85d42b7c`, which is this same kernel with the merge absent - and if the
+sluggishness survives *that*, then it was never memory management and the four
+scheduler commits are next on the list, because those are the only other thing
+that changed since the build the phone ran happily for a day.
