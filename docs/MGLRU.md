@@ -85,6 +85,38 @@ does not offer a hardware accessed bit, the walk is not available, MGLRU cannot
 be better than the LRU here, and the right move is to drop MGLRU rather than keep
 paying 3000 lines of merge conflict for nothing.
 
+## The second failure, and the verdict
+
+`41fac00aa` booted, took the PIN, and hung. Twice, reproducibly. The lock screen
+is exactly where a phone first does serious memory work - every app process and
+every service starts at once - so it is the first moment kswapd ages with the
+walks enabled.
+
+No log was captured. adb was not attached at the time and there is no serial
+console, so the mechanism is unknown and this file will not pretend otherwise.
+What is known is narrower and sufficient: the walk was the only difference from
+a build that boots, and it hung within seconds of the first memory pressure.
+
+The two failures bracket the feature:
+
+| config | result |
+|---|---|
+| core only (`b63ed8289`) | boots, degrades after hours |
+| core + walks (`41fac00aa`) | hangs after the PIN |
+
+Those are the two halves of the capability bitmap. There is no third
+configuration to try, so MGLRU leaves the main line: `4a8a27860`, a revert of
+the merge whose tree is byte-identical to `d85d42b7c`.
+
+Kept for the record: tag `mglru-walks-hang` (`41fac00aa`) and branch
+`mglru-experiment`.
+
+**What would change the verdict:** a 5.10 backport whose walk path is proven on
+a vendor tree with a serial console, on a device that is not someone's phone.
+Until then this is a solved question - solved in the negative, which is a result,
+not a failure.
+
+
 ## Why it is on at boot
 
 Enabling core at runtime calls `lru_gen_change_state(true)`, which walks every
@@ -131,14 +163,8 @@ echo 1000 > /sys/kernel/mm/lru_gen/min_ttl_ms
 | boots with core on | verified on device, `0x0001` |
 | survives an hour | verified |
 | better than the legacy LRU for a full day | **contradicted once**: sluggish after hours on `b63ed8289`, regardless of whether MGLRU was the newest thing on the phone |
-| walks are safe on this vendor tree | untested - `41fac00aa` is the first build that runs them |
+| walks are safe on this vendor tree | **no**: `41fac00aa` hangs after the PIN, twice |
 
-The next honest test is the one `41fac00aa` sets up: core *and* walks at boot,
-because core alone is a configuration whose only distinguishing feature is that
-it drops the information the algorithm needs.
-
-If it is still sluggish, the honest fallback is not another MGLRU variant. It is
-`d85d42b7c`, which is this same kernel with the merge absent - and if the
-sluggishness survives *that*, then it was never memory management and the four
-scheduler commits are next on the list, because those are the only other thing
-that changed since the build the phone ran happily for a day.
+Both halves are now measured, and neither works. The experiment is closed:
+`4a8a27860` reverts the merge, and its tree is identical to `d85d42b7c`, the
+build that ran for 16 hours without any of this.

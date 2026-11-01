@@ -91,12 +91,19 @@ if [ -n "$ZIP" ] && [ -f "$ZIP" ]; then
   zip_line="$(basename "$ZIP")  $(stat -c '%s' "$ZIP" 2>/dev/null || stat -f '%z' "$ZIP") bytes"
 fi
 
-# The recipe's most recent changes: what we did, as opposed to what the kernel
-# does. Filtered to the paths that actually reach the build - a commit that only
-# edits docs or this script is not a changelog entry for a kernel.
-commits="$(git -C "$ROOT" log -3 --format='%s' -- \
-  configs/tuning.fragment configs/pins.env configs/identity.env \
-  patches assets scripts/10-build.sh 2>/dev/null || true)"
+# What the kernel does, not what the recipe says.
+#
+# This used to list the last three commits of *this* repository, filtered by the
+# paths that reach a build. That is a changelog of our bookkeeping - and on
+# 2026-11-02 it shipped the zip that reverts MGLRU with the headline "walks are
+# back", describing the opposite of what the phone would run. The pinned commit's
+# subject cannot lie about itself: it is the commit that was compiled.
+KSRC_TIP="$(git -C "$WORK/out" log -1 --format='%s' 2>/dev/null || true)"
+if [ -n "$KSRC_TIP" ]; then
+  commits="$(printf '%s  %s' "$KERNEL_SHORT_SHA" "$KSRC_TIP")"
+else
+  commits="$(printf '%s  (kernel subject unavailable - see the zip hash)' "$KERNEL_SHORT_SHA")"
+fi
 
 patches="$(grep -oE 'Applying source patch [^ ]+' "$WORK/build.log" 2>/dev/null \
   | sed 's/Applying source patch //' || true)"
