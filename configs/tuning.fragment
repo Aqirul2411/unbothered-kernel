@@ -51,7 +51,8 @@ CONFIG_HZ=250
 #
 # Why this and not MGLRU: DAMON does not replace the LRU. It samples access
 # patterns and lets a policy (DAMON_RECLAIM) reclaim pages that are provably
-# cold. MGLRU rewrites reclaim and hung this phone; this only watches.
+# cold. MGLRU rewrites reclaim, and the one attempt to bring it up half-enabled
+# made the phone sluggish; this only watches. Nothing here depends on that.
 #
 # These two symbols change no behaviour on their own. Nothing is monitored until
 # a policy is configured, and configuring it needs debugfs, which needs root.
@@ -127,24 +128,28 @@ CONFIG_NET_SCH_CAKE=y
 CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
 
 # ---------------------------------------------------------------------------
-# 7. MGLRU: on at boot, core capability only.
+# 7. MGLRU: on at boot, all capabilities.
 #
-# The tree now carries Google's multi-gen LRU backport as a merge, and a commit
-# on top that keeps the page-table-walk capabilities off at boot.
+# The tree carries Google's multi-gen LRU backport as a merge. These two symbols
+# are the only config it needs: LRU_GEN_ENABLED makes the capabilities statically
+# true at boot, so no runtime transition ever runs.
 #
-# Why it is on at boot rather than toggled at runtime: enabling MGLRU on a loaded
-# phone calls lru_gen_change_state(), which moves every page already on the LRU
-# into the generation lists while taking pgdat->lru_lock in batches. That is
-# minutes of lock contention on a phone with several GB cached - the screen
-# froze, with no panic and no reboot. At boot the same migration is trivial
-# because the lists are nearly empty.
+# Why at boot and never at runtime: enabling MGLRU on a loaded phone calls
+# lru_gen_change_state(), which moves every page already on the LRU into the
+# generation lists while taking pgdat->lru_lock in batches. That is a stall long
+# enough to freeze the screen, with no panic and no reboot. At boot the same
+# migration is trivial because the lists are nearly empty.
 #
-# What boots: LRU_GEN_CORE only. The two walk capabilities are disabled in a
-# late_initcall, and switching them on later is a static branch, not a migration:
+# Do NOT repeat the first attempt, which booted core-only and disabled the two
+# page-table-walk capabilities "for safety". They are not an optional extra: with
+# the walk off, aging advances without scanning a page (vmscan.c line 3957), so
+# reclaim evicts in allocation order and the phone goes sluggish after hours of
+# use. Core-only is the broken configuration, not the cautious one.
 #
-#   su -c 'cat  /sys/kernel/mm/lru_gen/enabled'         # 0x0001 at boot
-#   su -c 'echo 0x7 > /sys/kernel/mm/lru_gen/enabled'   # add walks
-#   su -c 'echo 0 > /sys/kernel/mm/lru_gen/enabled'     # back to legacy LRU
+#   su -c 'cat  /sys/kernel/mm/lru_gen/enabled'         # expect 0x0003
+#   su -c 'echo 0 > /sys/kernel/mm/lru_gen/enabled'     # off, but see above:
+#                                                       # this migrates too, so
+#                                                       # only right after boot
 #
 # Measurement lives in debugfs, not in a config symbol: CONFIG_LRU_GEN_STATS is
 # declared in Kconfig and referenced zero times in mm/vmscan.c, so "enabling
