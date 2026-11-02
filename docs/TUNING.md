@@ -483,12 +483,14 @@ scale in `__setup_per_zone_wmarks()` - but the clamp would quadruple a reserve t
 vendor tuned deliberately, on a phone that is not reclaiming, so reverting is the
 honest move until some measurement asks for more free margin.
 
-**Open question from the same read:** `lsmod` shows `zram` and `zsmalloc` loaded
-(8 GB swap, 4.1 GB in use, 1.3 GB physical), while this build's `built.config`
-has `# CONFIG_ZSMALLOC is not set` and no `CONFIG_ZRAM` at all, and
-`MODULE_FORCE_LOAD` is off with `MODVERSIONS=y`. Something is loading a module
-this kernel should refuse. Needs root to settle; it also means the old "zram
-removed by measurement" claim describes the config, not necessarily the phone.
+**Open question from the same read (settled further down):** `lsmod` shows `zram`
+and `zsmalloc` loaded (8 GB swap, 4.1 GB in use, 1.3 GB physical), while this
+build's `built.config` has `# CONFIG_ZSMALLOC is not set` and no `CONFIG_ZRAM` at
+all. At the time this looked like the kernel loading something it should refuse;
+with root available it turned out to be ordinary `CONFIG_MODVERSIONS` behaviour -
+see "foreign vermagic" below. It does mean the old "zram removed by measurement"
+claim describes the config, not the phone.
+
 ### Who actually owns the VM knobs on this ROM (root shell, 2026-11-02)
 
 With root on the phone (`su -c`), every value is readable. The order of writers
@@ -533,12 +535,57 @@ park the phone instead of rebooting it. `softlockup_panic=1` and
 console + 4 MB pmsg) and empty, so a panic would still leave a record.
 
 **zram was never off.** The ROM's own `zram.ko` from `/vendor_dlkm` is loaded -
-`scmversion g496a309247f6`, i.e. built for `5.10.160-gki`, while the running
-kernel is `5.10.272-Unbothered` - with `MODULE_FORCE_LOAD` off and `MODVERSIONS`
-on. It works: 4.45 GB in swap, 1.29 GB of compressed pages, lzo-rle. Taint is
-5636, i.e. out-of-tree modules. So "zram removed by measurement" described the
-config and never the phone, and the kernel accepting a foreign vermagic is worth
-understanding before any module-side assumption is trusted.
+`vermagic=5.10.160-gki-g496a309247f6`, while the running kernel is
+`5.10.272-Unbothered/46128b05a-diag SMP preempt mod_unload modversions aarch64`.
+It works: 4.4 GB in swap, 1.2 GB of compressed pages, lzo-rle. Taint is 5636,
+which is out-of-tree + staging + a WARN, **not** `TAINT_FORCED_MODULE`, so nothing
+was force-loaded. So "zram removed by measurement" described the config and never
+the phone.
+
+**And the "foreign vermagic" alarm was my mistake, not a finding.** A module whose
+release string differs from the kernel's is *supposed* to load here, because this
+kernel is built with `CONFIG_MODVERSIONS=y` and upstream `same_magic()` in
+`kernel/module.c` skips the release prefix in exactly that case:
+
+    static inline int same_magic(const char *amagic, const char *bmagic,
+                                 bool has_crcs)
+    {
+            if (has_crcs) {
+                    amagic += strcspn(amagic, " ");
+                    bmagic += strcspn(bmagic, " ");
+            }
+            return strcmp(amagic, bmagic) == 0;
+    }
+
+`check_modinfo()` passes `info->index.vers` (present: the module has a `__versions`
+section), so only `" SMP preempt mod_unload modversions aarch64"` is compared and
+the symbol CRCs do the real compatibility check. That is the mechanism GKI vendor
+DLKMs rely on across stable bumps, and it is why 418 modules from `/vendor_dlkm`
+are loaded on this phone with our kernel in place. Nothing unvalidated is running;
+`MODULE_FORCE_LOAD` being off is irrelevant to it.
+
+Consequence worth keeping in mind: `CONFIG_ZRAM`/`CONFIG_ZSMALLOC` in our config
+cannot switch zram off on this device, because init loads the vendor .ko from
+`vendor_dlkm` before anything we control, and a kernel-only flash never touches
+that partition. If zram is ever to be reduced, it has to be done from userspace
+(`/sys/block/zram0/disksize`, or the module), not from the config.
+
+### watermark_scale_factor = 43, measured live on the phone (2026-11-02)
+
+Written with root and read back through `/proc/zoneinfo`, one second apart, with
+the original value restored immediately afterwards:
+
+    before   1    min 2896   low 11245   high 11969   (43.9 MB / 46.8 MB)
+    after   43    min 2896   low 22812   high 35104   (89.1 MB / 137.1 MB)
+
+`high - low` went to 12,292 pages = 2,858,738 * 43 / 10000 exactly, which confirms
+this tree's CAF watermark formula (`high = min + extra + 2*scale_term`,
+`low = min + extra + scale_term`) and confirms the knob is a live, working lever -
+it was only ever losing to `/vendor/bin/init.kernel.post_boot.sh` at boot.
+
+So the number Xiaomi intended for this device is reachable without a rebuild; it
+just has to be written after `kernel-post-boot` has run. The KernelSU module is
+the only writer that runs late enough.
 
 **Also from the command line (this is Xiaomi's boot image, which we never touch):**
 `kasan=off`, `slub_debug=-`, `cpufreq.default_governor=performance`,
