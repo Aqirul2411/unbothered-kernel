@@ -642,3 +642,50 @@ the ROM writes either. But no rc file, no post-boot script, no module and no
 `CONFIG_PANIC_TIMEOUT=5` still has no identified author. It is written after
 kernel init or not at all; a module write at `boot_completed` outranks anything
 from init either way.
+
+### The final build: one revert, and the reasons each other change was refused (2026-11-03)
+
+`Unbothered 5.10.272 | build 41459262575`, kernel `5d78169f7`, `-diag`.
+`gh api .../compare/46128b05a...5d78169f7` says exactly one file, `+1 -11`:
+`mm/page_alloc.c`. Nothing else changed, so the config is the one already
+verified booting on the phone (37 diffs against the reference config, 0
+significant bytes).
+
+This is a deliberately thin release. Everything else that looked like an
+improvement was refused for a stated reason:
+
+- **Raise the free-memory margin (again).** Refused: no stall to prevent. 342 s
+  of an in-use phone had `allocstall_normal`, `allocstall_movable`,
+  `pgscan_direct` and `pgsteal_direct` all at exactly 0. The margin is now 43,
+  written at runtime by the module, because that is the vendor's own number for
+  this device rather than our guess.
+- **Ship MGLRU.** Refused: it hangs this phone after the PIN, twice, with no log.
+  Addressable as tag `mglru-walks-hang`, untouched since.
+- **Bump KernelSU-Next.** Refused for this build: `dev-susfs` is 22 commits ahead
+  and 14 behind our pin `12f302e0`, i.e. the branch was rebased, and root is
+  exactly what carries the module holding every runtime value above. A moving
+  root driver is not worth a final build. (`pins.env` documents this as the one
+  pin we move on purpose, and the wrapper asserts it after install.)
+- **Build zram into our kernel** so the module matches our source revision.
+  Refused: a kernel-only flash never touches `vendor_dlkm`, init loads the
+  vendor's `zram.ko` from `modules.load` before anything we control, and
+  `CONFIG_MODVERSIONS` is what makes that load legal. There is no corruption
+  signal to fix, and replacing a working memory path on a daily driver for
+  tidiness is the wrong trade.
+- **Build cake/BBRplus as defaults, DAMON policy on.** Refused: all three are
+  compiled and available, chooseable at runtime, and none has a measurement.
+  Changing a default is a behaviour change with no evidence behind it.
+
+**What is still not explained.** "Slow after idle" was never reproduced in a
+kernel counter: no direct reclaim, no institutional stalls, PSI `some avg10`
+under 0.4%, and `top` during the supposed idle window had `com.facebook.katana`
+at 11.5% CPU and `system_server` at 13.1%. If it comes back, sample *while* it
+happens - `/proc/vmstat` deltas, `/proc/pressure/*`, and per-app CPU in the same
+window - rather than tuning from a quiet phone. That is also the only thing that
+would justify touching a watermark again.
+
+**Watchdog caveat worth remembering.** The module now arms
+`hung_task_timeout_secs 300` with `hung_task_panic 1` and `panic 5`. If a ROM
+task ever sits in D-state for five minutes this reboots the phone by design. If
+that ever happens randomly, `WATCHDOG=0` in `/data/adb/unbothered-tune.conf` and
+a reboot puts it back the way the ROM shipped it.

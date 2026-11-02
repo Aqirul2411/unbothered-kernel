@@ -1,6 +1,6 @@
 id=unbothered-tune
-name=Unbothered memory tuning
-version=1.0
-versionCode=1
+name=Unbothered tune
+version=3.1
+versionCode=7
 author=Aqirul2411
-description=Turns zram on if init did not, then applies three vm tunables that only make sense with compressed swap. Disable in the manager to undo everything; nothing here survives a reboot except the tuned values, and those revert when the module is off.
+description=zram on if init did not (half of RAM, capped, lz4 first), zram-aware sysctls, a 128 MiB writeback cap instead of 20%-of-RAM, flash-friendly I/O queue settings, and a 12-hour app-cache sweep at idle priority that skips apps in use and offline media. 3.0 makes the sweep daemon's liveness a kernel flock instead of a PID file, so it cannot silently fail to start, and adds self-healing recovery from the action button. 3.1 also holds two values userspace was disarming: watermark_scale_factor 43 (what the vendor's own post_boot script means to set for this model and never does) and the hung-task and panic watchdogs, so a hang records itself in ramoops and reboots instead of freezing with no log. Touches no audio, CPU governor, LMKD or KSM setting. Logs to /data/adb/unbothered-tune and mirrors to /data/local/tmp/unbothered-tune, readable over adb without root. Disable in the manager and reboot to undo.

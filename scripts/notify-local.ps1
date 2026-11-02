@@ -40,6 +40,40 @@ Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 Copy-Item "$($art.FullName)\*" $work -Recurse -Force
 
+# 30-notify.sh names the compiled commit from `git log -1` in work/ksrc, and a
+# local notify has no source tree, so it falls back to "kernel subject
+# unavailable - see the zip hash". That fallback exists because a changelog once
+# described the opposite of what the phone would run, so it must never be
+# guessed - but it can be looked up. Ask the kernel repository for the subject of
+# the commit pinned in configs/pins.env and hand it over as the one line the
+# script reads. If the lookup fails, the honest fallback still applies.
+try {
+  $pins = Join-Path $root "configs/pins.env"
+  $sha  = (Select-String -LiteralPath $pins -Pattern '^KERNEL_SHA="([0-9a-f]{40})"' |
+             Select-Object -First 1).Matches[0].Groups[1].Value
+  $krepo = (Select-String -LiteralPath $pins -Pattern '^KERNEL_REPO=".*/([^/"]+)\.git"' |
+             Select-Object -First 1).Matches[0].Groups[1].Value
+
+  $commit = & gh api "repos/Aqirul2411/$krepo/commits/$sha" | ConvertFrom-Json
+  $subject = ($commit.commit.message -split "`n")[0]
+  if ($subject) {
+    # A throwaway repo carrying that one subject, so `git log -1 --format=%s`
+    # returns exactly what the kernel build compiled. The message goes through a
+    # file: PowerShell rewrites "->" inside a native argument into a
+    # redirection, and a subject with an arrow silently became a git error.
+    $ksrc    = Join-Path $work "ksrc"
+    $gitExe  = "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe"
+    $msgFile = Join-Path $work "kernel-subject.txt"
+    [IO.File]::WriteAllText($msgFile, $subject)
+    New-Item -ItemType Directory -Force -Path $ksrc | Out-Null
+    & $gitExe -C $ksrc init -q | Out-Null
+    & $gitExe -C $ksrc -c user.email=notify@local -c user.name=notify commit -q --allow-empty -F $msgFile | Out-Null
+    Write-Host "[notify] kernel subject: $subject"
+  }
+} catch {
+  Write-Host "[notify] kernel subject lookup failed, the zip hash stands in: $_"
+}
+
 $bash = "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe"
 $env:TELEGRAM_BOT_TOKEN = $token
 $env:TELEGRAM_CHAT_ID   = $ChatId

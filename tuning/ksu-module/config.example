@@ -1,0 +1,93 @@
+# unbothered-tune 3.0 settings.
+#
+# Copy to /data/adb/unbothered-tune.conf, keep the lines you want to change,
+# delete the rest (the module defaults are used for anything missing), then
+# reboot. This file is read by both service.sh and clean.sh, so cache settings
+# apply to the running daemon only after the next boot.
+#
+# Nothing here relates to audio. The module does not read or write any audio
+# property, HAL, mixer path or audio module setting, so it cannot conflict with
+# an audio mod.
+
+# --- zram (compressed swap in RAM) ---------------------------------------
+ZRAM_ENABLE=1
+# Percentage of physical RAM to expose as swap. Default 50.
+ZRAM_PERCENT=50
+# Hard ceiling in MiB. 4096 is the point where extra swap stops buying
+# anything on a phone: every extra page has to be compressed and decompressed
+# on a core that could be drawing the screen. 0/empty is not valid.
+# Note: if the ROM already brought zram up (most stock ROMs do), the module
+# leaves it exactly as it found it and none of the three lines above apply.
+ZRAM_MAX_MB=4096
+# auto = lz4, else lzo-rle, else lzo, else whatever the kernel lists first.
+# Force one with e.g. lz4, lzo-rle, zstd.
+ZRAM_ALGO=auto
+
+# --- sysctls --------------------------------------------------------------
+SYSCTL_TUNING=1
+# swappiness and page-cluster are only touched when compressed swap is active;
+# on a device with zram that means 100 and 0.
+
+# --- writeback (byte cap beats percentage on >6 GB) ------------------------
+# A percentage of RAM scales with the phone: 20% of 12 GB is 2.4 GB of dirty
+# pages, and the flush is a visible stall. The cap keeps one burst at 128 MiB.
+WRITEBACK_CAP=1
+DIRTY_BG_MB=32
+DIRTY_MB=128
+# Set WRITEBACK_CAP=0 to use dirty_ratio 20 / dirty_background_ratio 5 instead.
+
+# --- reclaim / oom bookkeeping --------------------------------------------
+# 0 kills kswapd's post-spike reclaim boost (fewer launch-time stalls);
+# 15000 restores stock. OOM_DUMP_TASKS=0 skips the all-tasks stack dump
+# before an OOM kill.
+WATERMARK_BOOST=0
+OOM_DUMP_TASKS=0
+# The margin kswapd keeps free, in 1/10000 of managed pages. 43 is Xiaomi's own
+# number for this model, from a branch of their post_boot script that never runs
+# because it compares ro.product.name ("marble_global") against "marble". 0 =
+# leave whatever the ROM set, which on this phone is 1.
+WATERMARK_SCALE=43
+
+# --- watchdogs ------------------------------------------------------------
+# Both are compiled into the diagnostics kernel and both are switched off by
+# userspace at boot: init.rc writes hung_task_timeout_secs 0, and the live panic
+# sysctl reads 0 instead of the compiled 5. With these set, a hang dumps itself
+# to ramoops and reboots instead of freezing the screen with no record, and
+# PANIC_TIMEOUT is what makes the reboot happen at all.
+#   WATCHDOG=0 leaves every one of them exactly as the ROM set it.
+#   HUNG_TASK_SECS=300 is chosen over the kernel default 120 so that a task
+#   waiting on slow storage for two minutes does not cost you a reboot.
+WATCHDOG=1
+HUNG_TASK_SECS=300
+PANIC_TIMEOUT=5
+
+# --- I/O ------------------------------------------------------------------
+# Set scheduler=none and iostats=0 on internal flash, read_ahead=128 KiB.
+IO_TUNING=1
+
+# --- 12-hour cache sweep --------------------------------------------------
+CACHE_CLEAN=1
+CACHE_INTERVAL_H=12
+# Caches touched within this many hours are left alone, so the apps you
+# actually use do not rebuild their cache twice a day.
+CACHE_KEEP_H=6
+# Ignore caches smaller than this; clearing 200 KiB costs more than it frees.
+# Raise it on a phone with plenty of free space, lower it to free more.
+CACHE_MIN_MB=8
+# When /data has less free space than this, also ask PackageManager to trim.
+CACHE_FREE_TARGET_MB=2048
+CACHE_TRIM=1
+# Also sweep /sdcard/Android/data/*/cache.
+CACHE_EXTERNAL=1
+# Run the sweep at the lowest CPU and I/O priority so it cannot cause a
+# stutter while something is playing. 0 = run at normal priority.
+CACHE_LOW_PRIORITY=1
+# Full cache clear for these packages, space-separated. Defaults cover music
+# and video apps whose cache is offline media, plus chat apps where a wiped
+# cache means re-downloaded thumbnails.
+CACHE_EXCLUDE="com.spotify.music com.google.android.youtube com.google.android.apps.youtube.music com.netflix.mediaclient com.amazon.avod.media.playback com.disney.disneyplus com.hulu.plus com.google.android.apps.photos com.google.android.apps.podcasts org.videolan.vlc com.mxtech.videoplayer.ad com.plexapp.android com.audible.application com.whatsapp org.telegram.messenger com.instagram.android"
+
+# Drop the kernel page cache as well. Off on purpose: it throws away hot file
+# data and makes the next app launch slower, while zram already handles the
+# memory pressure that drop_caches pretends to fix.
+DROP_CACHES=0
