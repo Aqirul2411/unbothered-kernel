@@ -166,3 +166,42 @@ CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
 #
 #   # CONFIG_KASAN is not set
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# 8. Diagnostics: make the next hang leave a record.
+#
+# A hang that leaves no log is not a test, it is a coin flip. 41fac00aa froze
+# right after the PIN and produced nothing usable: PSTORE, PSTORE_RAM and
+# PSTORE_CONSOLE were already compiled in, so the console ring *would* have been
+# written to ramoops - but nothing ever declared a lockup, so there was no panic
+# to mark it and nothing that stopped the phone from just sitting there.
+#
+# What was missing:
+#
+#   # CONFIG_SOFTLOCKUP_DETECTOR is not set   <- a CPU spinning forever was
+#                                               never noticed at all
+#   CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0  <- a task stuck in D-state for
+#                                               120s was logged, not acted on
+#
+# With both panicking, the phone writes the dump into ramoops and reboots, and
+# /sys/fs/pstore on the next boot holds the answer. PANIC_TIMEOUT has to be
+# positive for that reboot to happen: -1 keeps the kernel sitting in panic, which
+# would turn a frozen screen into a permanently frozen screen.
+#
+# Cost: one watchdog hrtimer per CPU from the softlockup detector, and the
+# existing hung-task thread doing the same work it already did. If idle drain
+# moves, this is the line that comes back out - it is a diagnostic, not a daily
+# driver setting. After a hang has been explained, remove all four.
+#
+# Reading it back:
+#
+#   su -c 'ls -l /sys/fs/pstore'
+#   su -c 'cat /sys/fs/pstore/console-ramoops*'
+#
+# If /sys/fs/pstore is empty and dmesg has no "ramoops" line, the device reserves
+# no region for it and this buys nothing - check that before trusting it.
+# ---------------------------------------------------------------------------
+CONFIG_SOFTLOCKUP_DETECTOR=y
+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
+CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
+CONFIG_PANIC_TIMEOUT=5
