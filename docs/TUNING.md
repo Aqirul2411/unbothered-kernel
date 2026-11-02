@@ -435,3 +435,57 @@ deserves its own A/B rather than a ride-along.
 **On that KASAN row:** a second, much more famous kernel reviewed earlier also
 ships with KASAN on, which is a useful reminder that "other kernels disable it"
 was never the argument here - this phone's own boot test was.
+### Measured on the phone: `watermark_scale_factor` never took effect (2026-11-02)
+
+Read over adb from the running `46128b05a-diag` kernel, `/proc/zoneinfo` (the
+sysctl itself is root-only for `shell`):
+
+    Node 0, zone Normal    min 2896    low 11245    high 11969    managed 2858738
+
+That settles it without root. This tree uses the CAF variant of
+`__setup_per_zone_wmarks()` (`mm/page_alloc.c`), not mainline:
+
+    watermark[LOW]  = min + extra_free_kbytes_share + max(min/4, managed*scale/10000)
+    watermark[HIGH] = min + extra_free_kbytes_share + 2 * that
+
+`high - low = 724` and `min/4 = 724` exactly, so the scale term contributed
+nothing: the value in effect is 0-2, not 150 (150 on 2,858,738 managed pages is
+42,881, which would put LOW at about 209 MB instead of the 43.9 MB measured).
+`low - min - 724 = 7625` pages, and `sys.sysctl.extra_free_kbytes` is 30,375 kB
+= 7,593 pages, so the rest of the arithmetic closes to 0.4%.
+
+**Who overwrites it.** `/system/etc/init/hw/init.rc` has the MIUI hook
+
+    on property:persist.vendor.watermark_scale_factor=*
+        write /proc/sys/vm/watermark_scale_factor ${persist.vendor.watermark_scale_factor}
+
+but that property is empty on this ROM, so the hook never fires. The domain with
+write access to `proc_watermark_scale_factor` is `extra_free_kbytes` - the
+`/system/bin/extra_free_kbytes.sh` script, which init runs from
+`on property:sys.sysctl.extra_free_kbytes=*` and which the framework calls at
+boot with 30375. One script, both values: it sets the fixed reserve and drops the
+proportional one.
+
+**What it means.** The phone was never running a thin margin. It runs a low
+watermark of 43.9 MB: GKI's own default here would be 22.5 MB (min 11.6 MB +
+`managed*10/10000`), and Xiaomi replaces the proportional scale with a flat
+30 MB `extra_free_kbytes`. Forcing 150 on top of that is not "restoring a margin
+that was missing", it is 4.7x the reserve the vendor chose, and the kernel code
+default cannot win against a boot script that runs after it.
+
+**And there is no reclaim to fix.** Sampled 61 s while the phone was dozing:
+`pgscan_direct` 0, `pgsteal_direct` 0, `allocstall_normal/movable` 0. The 4.39M
+`pgscan_direct` in the since-boot total accumulated during the boot after the
+flash (dex2oat and cache rebuild), not in steady state.
+
+**Verdict:** `46128b05a` is dead code on this ROM. Either revert it or clamp the
+scale in `__setup_per_zone_wmarks()` - but the clamp would quadruple a reserve the
+vendor tuned deliberately, on a phone that is not reclaiming, so reverting is the
+honest move until some measurement asks for more free margin.
+
+**Open question from the same read:** `lsmod` shows `zram` and `zsmalloc` loaded
+(8 GB swap, 4.1 GB in use, 1.3 GB physical), while this build's `built.config`
+has `# CONFIG_ZSMALLOC is not set` and no `CONFIG_ZRAM` at all, and
+`MODULE_FORCE_LOAD` is off with `MODVERSIONS=y`. Something is loading a module
+this kernel should refuse. Needs root to settle; it also means the old "zram
+removed by measurement" claim describes the config, not necessarily the phone.
