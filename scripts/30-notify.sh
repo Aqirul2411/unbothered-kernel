@@ -98,7 +98,11 @@ fi
 # 2026-11-02 it shipped the zip that reverts MGLRU with the headline "walks are
 # back", describing the opposite of what the phone would run. The pinned commit's
 # subject cannot lie about itself: it is the commit that was compiled.
-KSRC_TIP="$(git -C "$WORK/out" log -1 --format='%s' 2>/dev/null || true)"
+# The kernel tree is $WORK/ksrc, not $WORK/out: the pinned build.sh sets
+#   OUTDIR="$WORKDIR/out"   (artifacts)
+#   KSRC="$WORKDIR/ksrc"    (sources)
+# so "out" is a directory of zips and would silently fail this lookup.
+KSRC_TIP="$(git -C "$WORK/ksrc" log -1 --format='%s' 2>/dev/null || true)"
 if [ -n "$KSRC_TIP" ]; then
   commits="$(printf '%s  %s' "$KERNEL_SHORT_SHA" "$KSRC_TIP")"
 else

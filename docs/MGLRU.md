@@ -168,3 +168,56 @@ echo 1000 > /sys/kernel/mm/lru_gen/min_ttl_ms
 Both halves are now measured, and neither works. The experiment is closed:
 `4a8a27860` reverts the merge, and its tree is identical to `d85d42b7c`, the
 build that ran for 16 hours without any of this.
+
+## Where the "best" backport actually is (2026-11-02)
+
+Searched GitHub and ACK after the hang, to answer "is there a better 5.10 MGLRU
+than the one we merged". Findings:
+
+**Arkael's branch is ACK's.** `mm/vmscan.c` at our merge commit is 7312 lines
+with 134 `lru_gen_` references; AOSP `android13-5.10` is 7289 lines with 134.
+Same series (2022-2023). So the merge was not second-rate - it was the official
+Android backport.
+
+**`android12-5.10` does not have it at all** (4486 lines, 0 references). MGLRU in
+ACK lives on `android13-5.10` and later.
+
+**A same-device tree runs it fully enabled.** `Pzqqt/android_kernel_xiaomi_marble`
+@ `bouquet` has `CONFIG_LRU_GEN=y` + `CONFIG_LRU_GEN_ENABLED=y` - all
+capabilities on, walks included - on the same SM7475, and does not hang. Its
+`mm/vmscan.c` is 7441 lines and carries three fixes ours does not:
+
+| commit | date |
+|---|---|
+| `BACKPORT: mm: mglru: promote mapped executable folios after first usage` | 2026-07-20 |
+| `ANDROID: mm: mglru: invoke root shrinker before memcg-specific ones` | 2026-09-30 |
+| `ANDROID: mm: mglru: let MADV_WILLNEED pages take extra trip in active list` | 2026-10-02 |
+
+The first one is the one that matters for us: it changes which pages the walk
+promotes, and our failure mode was exactly "live app code gets evicted".
+
+That is the candidate for a retry: ACK's series plus those three, `min_ttl_ms`
+defaulted to 1000 rather than 0. Not on the daily driver, and only once a hang
+leaves a log.
+
+**Independent corroboration.** `rachitbangwal/MGLRU-Disable` exists to turn MGLRU
+off at boot on a 5.10 custom kernel because it "caused lags during heavy IO
+operations such as extraction, downloading or adb push/pull". Same class of
+complaint, different tree, same kernel generation.
+
+## Why the hang left no trace
+
+`CONFIG_PSTORE`, `PSTORE_RAM` and `PSTORE_CONSOLE` were compiled in all along, so
+the console ring would have been written to ramoops. What was missing was
+anything that *declares* a lockup:
+
+```
+# CONFIG_SOFTLOCKUP_DETECTOR is not set
+CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=0
+CONFIG_PANIC_TIMEOUT=-1
+```
+
+A spinning CPU was never noticed, a task stuck in D-state for 120s was logged but
+not acted on, and even a panic would have sat there forever instead of rebooting.
+The `-diag` build turns all three around, so the next failure arrives as a dump
+in `/sys/fs/pstore` rather than as a frozen screen.
