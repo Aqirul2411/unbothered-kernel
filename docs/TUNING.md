@@ -314,3 +314,59 @@ we already have. Full evidence, symbol by symbol, in
 | Mahiru `sched/fair: unlink misfit from cpu overutilized` | **taken** in batch 3: +12 −11, upstream ACK work, applies cleanly. See the batch note below for the risk this carries |
 
 
+
+### Pandora `5.10.247` and Nexus `4.19.325` (2026-11-02)
+
+Two zips handed over from a Telegram channel. Neither can be flashed here, and
+that is a finding rather than a disappointment:
+
+| zip | kernel | for | evidence |
+|---|---|---|---|
+| `Kernel-Pandora-5.10-26w08d` | `5.10.247-android12-9-Pandora-26w08d` | one build of a multi-device series, this one for the 8-series | the Image carries `cape` (SM8475) platform strings and **no** `ukee` |
+| `Nexus-BETA-alioth` | `4.19.325-cip136-st20-perf` | `alioth` (POCO F3) | its own `device.name1=alioth` gate |
+
+Pandora's AnyKernel names our SoC in its AVB exception (`sku != cape && sku !=
+ukee`), so the project does target marble - just not in this artifact. Nexus is a
+generation out of reach (4.19, WALT, a different SoC).
+
+**Their sources are not public.** No repository contains `pandora_kfas` or
+`pandora_config`, so there is nothing to fork in the literal sense. The one
+public tree that touches this kernel family is `wenrouhao/hfdem-PowerTune`, the
+tuning module that probes `/sys/module/pandora_config/parameters/enable_mm_vhs`;
+it is forked to `Aqirul2411/hfdem-PowerTune` and is where the values below come
+from. `TxGoldenstar/android_kernel_xiaomi_sm8250-bakasu` (`4.19.325-cip135-st19`)
+is the nearest public source to the Nexus zip's `stXX` lineage and is forked too.
+
+#### The memory block, checked line by line against our own source
+
+Five of its eight writes are already our defaults, which is worth knowing before
+copying them:
+
+| their write | our tree at `4a8a27860` | verdict |
+|---|---|---|
+| `watermark_boost_factor=15000` | `page_alloc.c:375` already 15000 | no-op |
+| `swappiness=60` | `vmscan.c:182` already 60 | no-op |
+| `compaction_proactiveness=20` | `compaction.c:2655` already 20 | no-op |
+| `watermark_scale_factor=150` | `page_alloc.c:377` is 10 | **taken** |
+| `min_free_kbytes=65536` | baselines 1024, computed to about 14 MB | rejected for now: 4.5x the reserve, on top of the wider margin |
+| MGLRU `0x0007` + `min_ttl_ms=1000` | no `lru_gen` in this build | inert; it is the retry recipe, not a change |
+| THP `always` | `TRANSPARENT_HUGEPAGE_MADVISE` | rejected: fights the vendor default we inherit |
+| zram + `swappiness` | not built | rejected: removed by measurement |
+
+**Taken:** `46128b05a`, `watermark_scale_factor` 10 -> 150. Watermarks are the
+margin kswapd keeps ahead of allocation; at 0.1% a burst can outrun it and land
+in direct reclaim, where the task that asked for the page frees pages itself -
+a stall mid-scroll rather than a slow page. Read it back with
+`cat /proc/sys/vm/watermark_scale_factor`; if it is not 150, a vendor init script
+overwrote it later in boot and any measurement is of the vendor, not this commit.
+
+**Rejected, with reasons.** `full LTO` (build time, no measured gain),
+`kryo785` and `heapgrowthlimit=512m` (SM8475 and RAM-size specific),
+`BFQ` (candidate for a later A/B, not for a batch), `WALT` (4.19 plumbing),
+the `ro.lmk.*` props and the Xiaomi `mms`/`spc`/`mfz` disabling (userspace, a
+module's business, not the kernel's - and they belong to a ROM build).
+
+**One thing to remember from their installer:** they deliberately skip
+`avbctl disable-verity` and `disable-verification` on `cape` and `ukee`. Our SoC
+is `ukee`. If AVB handling is ever added to our AnyKernel script, that is the
+place it is known to go wrong.
