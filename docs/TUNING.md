@@ -489,3 +489,59 @@ has `# CONFIG_ZSMALLOC is not set` and no `CONFIG_ZRAM` at all, and
 `MODULE_FORCE_LOAD` is off with `MODVERSIONS=y`. Something is loading a module
 this kernel should refuse. Needs root to settle; it also means the old "zram
 removed by measurement" claim describes the config, not necessarily the phone.
+### Who actually owns the VM knobs on this ROM (root shell, 2026-11-02)
+
+With root on the phone (`su -c`), every value is readable. The order of writers
+matters more than the values:
+
+| who | when | what it writes |
+|---|---|---|
+| our kernel | compile | `watermark_scale_factor = 150`, `swappiness = 60`, `min_free_kbytes` computed, THP madvise, `watermark_boost_factor = 15000`, `compaction_proactiveness = 20` |
+| `/system/etc/init/hw/init.rc` | early boot | `watermark_boost_factor 0`, `hung_task_timeout_secs 0`, `overcommit_memory 1`, `dirty_expire_centisecs 200`, `dirty_background_ratio 5` |
+| `/vendor/bin/init.kernel.post_boot.sh` (service `kernel-post-boot`) | after init | `swappiness 100`, `watermark_scale_factor 43 or 1`, `watermark_boost_factor 0`, `compaction_proactiveness 0`, THP `never`, `min_free_kbytes 11584` |
+| `/system/bin/extra_free_kbytes.sh` (framework sets `sys.sysctl.extra_free_kbytes`) | later | `extra_free_kbytes 30375` (this kernel has the knob, so the script exits before touching the scale factor) |
+| KernelSU module `unbothered-tune` | `boot_completed` | `swappiness 100`, `page-cluster 0`, `dirty_bytes 128M` / `dirty_background_bytes 32M`, `dirty_writeback_centisecs 1500`, `watermark_boost_factor 0`, `oom_dump_tasks 0`, schedstats 0, i/o none + 128 KiB readahead |
+| `/data/adb/service.d/templar_power_daily.sh` | `boot_completed` | `compaction_proactiveness 0`, `page_cluster 0`, `watermark_boost_factor 0`, `stat_interval 10`, `dirty_writeback_centisecs 1500` |
+
+So a compile-time default is a fallback for the first seconds of boot and nothing
+more. Any tunable we want to *hold* has to be written after
+`kernel-post-boot` runs - which is exactly what the KernelSU module does.
+
+**The vendor bug worth knowing about.** The marble branch never runs:
+
+    ProductName=`getprop ro.product.name`          # "marble_global" on this phone
+    if [ "$ProductName" == "marble" ]; then
+        echo 43 > /proc/sys/vm/watermark_scale_factor
+    else
+        echo 1 > /proc/sys/vm/watermark_scale_factor
+    fi
+
+`ro.product.name` is `marble_global`, `ro.product.device` is `marble`. The string
+comparison misses, so this phone runs the generic value 1 while Xiaomi's own
+statement of intent for this model is 43. Measured low watermark with 1: 43.9 MB.
+With 43: `max(min/4, managed*43/10000)` = 12,292 pages, so about 89 MB.
+
+That reframes `46128b05a` twice over: 150 was 3.5x the vendor's own number for
+this device, *and* it was overwritten anyway. 43 is a defensible value because it
+is not our guess - it is the ROM's, restored.
+
+**The watchdogs are half-defeated by userspace.** `init.rc:372` writes
+`hung_task_timeout_secs 0`, so `hung_task_panic=1` can never fire, and the live
+`panic` sysctl is 0, not the 5 this build was configured with, so a panic would
+park the phone instead of rebooting it. `softlockup_panic=1` and
+`panic_on_oops=1` are live. ramoops is registered (`ramoops@0xa7000000`, 2 MB
+console + 4 MB pmsg) and empty, so a panic would still leave a record.
+
+**zram was never off.** The ROM's own `zram.ko` from `/vendor_dlkm` is loaded -
+`scmversion g496a309247f6`, i.e. built for `5.10.160-gki`, while the running
+kernel is `5.10.272-Unbothered` - with `MODULE_FORCE_LOAD` off and `MODVERSIONS`
+on. It works: 4.45 GB in swap, 1.29 GB of compressed pages, lzo-rle. Taint is
+5636, i.e. out-of-tree modules. So "zram removed by measurement" described the
+config and never the phone, and the kernel accepting a foreign vermagic is worth
+understanding before any module-side assumption is trusted.
+
+**Also from the command line (this is Xiaomi's boot image, which we never touch):**
+`kasan=off`, `slub_debug=-`, `cpufreq.default_governor=performance`,
+`log_buf_len=2M`, `cgroup_disable=pressure`. KASAN=y and SLUB_DEBUG=y therefore
+cost nothing at runtime - which is consistent with the earlier KASAN experiment
+having been about the build, not the sanitizer.
