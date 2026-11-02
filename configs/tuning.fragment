@@ -200,7 +200,14 @@ CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
 #
 # If /sys/fs/pstore is empty and dmesg has no "ramoops" line, the device reserves
 # no region for it and this buys nothing - check that before trusting it.
+#
+# LOCKUP_DETECTOR is listed because SOFTLOCKUP_DETECTOR *selects* it: it is not
+# a choice, it is the dependency pulled in behind it. Without a line here the
+# verifier found it in the built config, could not find it in this file, and
+# refused the build - which is the guard working as intended, since a symbol
+# nobody asked for is exactly what a config allowlist exists to catch.
 # ---------------------------------------------------------------------------
+CONFIG_LOCKUP_DETECTOR=y
 CONFIG_SOFTLOCKUP_DETECTOR=y
 CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
 CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
