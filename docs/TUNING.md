@@ -370,3 +370,68 @@ module's business, not the kernel's - and they belong to a ROM build).
 `avbctl disable-verity` and `disable-verification` on `cape` and `ukee`. Our SoC
 is `ukee`. If AVB handling is ever added to our AnyKernel script, that is the
 place it is known to go wrong.
+
+### Oxygen+ "5.10.248" `alioth` (2026-11-02)
+
+`5.10.248-alioth-AOSP-Oxygen+-1703-08052026.zip`, 30.87 MB, "Oxygen+ by Danda".
+**The file name is wrong about its own kernel.** The `Image` inside reports
+
+    Linux version 4.19.420BPF-Oxygen+ (danda@pavilion)
+    (Oxygen clang version 20.0.0, LLD 20.0.0) #1 SMP PREEMPT
+    Fri May 8 17:04:07 WIB 2026
+
+so it is a 4.19 tree, not a 5.10.272-adjacent one, and the config settles what it
+is for: `CONFIG_ARCH_KONA=y` (SM8250), `CONFIG_LOCALVERSION="-perf"`. The build
+timestamp in the name (17:03, 08-05-2026) matches the Image to the minute, so the
+zip is that build - only the `5.10.248` prefix is fiction. `Image-ksu.gz` is the
+same tree with `KernelSU` compiled in (`#2`, two minutes later).
+
+**Not flashable here**, for two independent reasons:
+
+| gate | theirs | ours |
+|---|---|---|
+| device | `device.name1=alioth`, `name2=aliothin`, `do.devicecheck=1` | `marble` (`ukee`) |
+| SoC | `CONFIG_ARCH_KONA=y`, SM8250 | SM7475, `ukee` |
+
+AnyKernel's device gate aborts on the codename before it touches a partition, and
+even past it the kernel is for a different SoC on a different boot layout. It also
+patches **both** `boot` and `vendor_boot` with the same `Image` - correct for a
+4.19 device, but it means this zip is not a source of installer logic for us.
+
+**Installer, for the record.** Two variants in one zip, chosen at flash time by
+reading `getevent` for a volume key (`tools/oxygen.sh`), plus a `dtbo.img` /
+`dtbo-5k.img` battery-capacity choice for alioth; `kernel.conf` overrides both for
+unattended sideload. A reasonable design, and 30.87 MB to deliver what we deliver
+in 16.6 MB, because they build two variants for a device family and we build one
+for one phone. Nothing to copy.
+
+**Config against ours** (`built.config` at `46128b05a`; 2050 to 5192 symbols,
+different tree generations, so this is not a diff, only a reading of the
+differences that could decide behaviour):
+
+| symbol | theirs | ours | verdict |
+|---|---|---|---|
+| `HZ` | 250 | 250 | third independent vote for 250, already ours |
+| `SCHED_WALT` + `SCHED_TUNE` | y | not built | their 4.19 scheduler plumbing; nothing to inherit on 5.10 |
+| `SCHED_BORE` | not built | y | ours, kept |
+| `SCHED_AUTOGROUP` | y | n | rejected before: fights Android's own cgroups |
+| `ZRAM` + `ZSMALLOC` | y | n | rejected by measurement on this phone |
+| `IOSCHED_BFQ`, `IOSCHED_DEADLINE`, `IOSCHED_CFQ` | y | n | 4.19 scheduler menu; BFQ stays a later A/B, not a batch |
+| `BLK_WBT` | y | n | desktop writeback trade; no measured need |
+| `DAMON`/`DAMON_RECLAIM` | not built | y | ours, inert until configured |
+| `KSM`, `TRANSPARENT_HUGEPAGE` | n | y | ours, both vendor-inherited defaults |
+| `DAMON_VADDR` | n | y | ours (5.10 backport), passive |
+| `DEBUG_INFO` | y | n | theirs ships DWARF; nothing to take |
+| `KASAN` | n | **y** | **cannot follow** - see "REVERTED, do not add back" above: the KASAN-off build hangs this phone at the POCO logo |
+| `LTO_CLANG_THIN`, `CFI_CLANG`, `SHADOW_CALL_STACK`, `INIT_ON_ALLOC_DEFAULT_ON` | n | y | Google GKI defaults; dropping one is its own measured argument |
+| `DEFAULT_TCP_CONG` | `cubic` | `bbr3` | ours |
+| `PANIC_TIMEOUT` | -1 | 5 | ours is the temporary diagnostic |
+
+**Nothing taken.** The one row that looks like a win - KASAN off - is the exact
+thing that made this phone unbootable, and the rest is either a 4.19 menu we do
+not have, a decision already measured here, or a GKI hardening default that
+deserves its own A/B rather than a ride-along.
+
+**On that KASAN row:** a second, much more famous kernel reviewed earlier also
+ships with KASAN on, which is a useful reminder that "other kernels disable it"
+was never the argument here - this phone's own boot test was.
