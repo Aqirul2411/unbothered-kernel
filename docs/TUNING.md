@@ -592,3 +592,53 @@ the only writer that runs late enough.
 `log_buf_len=2M`, `cgroup_disable=pressure`. KASAN=y and SLUB_DEBUG=y therefore
 cost nothing at runtime - which is consistent with the earlier KASAN experiment
 having been about the build, not the sanitizer.
+
+### 342 s of an in-use phone, no adb traffic: there is no reclaim stall (2026-11-02)
+
+The earlier 61 s sample was taken while the phone was dozing, and a later one was
+contaminated by our own `logcat -b all -d` dump: 25k lines allocate, and the
+reclaim it triggered was ours, not the phone's. This window has nothing from us
+in it. Same build (`46128b05a-diag`), uptime 2995 -> 3337 s:
+
+| counter | delta | per second |
+|---|---|---|
+| `pgscan_kswapd` | +618,068 | 1,807 pages/s |
+| `pgsteal_kswapd` | +391,434 | 1,144 pages/s (~4.6 MB/s) |
+| `pswpout` | +72,405 | 212 pages/s (~0.85 MB/s) |
+| `pswpin` | +61,814 | 181 pages/s |
+| `pgmajfault` | +65,043 | 190 faults/s |
+| `allocstall_normal` | 0 | 0 |
+| `allocstall_movable` | 0 | 0 |
+| `pgscan_direct` | 0 | 0 |
+| `pgsteal_direct` | 0 | 0 |
+
+Zone Normal: free 28,794 pages, min 2,896, low 11,307, high 12,031. MemFree
+123,744 kB, MemAvailable 4,385,832 kB, 4.3 GB of the 8 GB zram in use. PSI
+memory `some avg10` ended at 0.34%; load average 5.38.
+
+**Reading it.** Reclaim is entirely background kswapd, and the phone is not
+short of memory: 4.4 GB is available, and the 4.3 GB in zram is Xiaomi's choice
+of an 8 GB swap device, not a symptom. Page-cache churn at 4.6 MB/s is what a
+phone running `system_server`, Facebook, an e-wallet, Telegram, Intune and
+SurfaceFlinger at the same time looks like - `top` had `com.facebook.katana` at
+11.5% CPU and `system_server` at 13.1%.
+
+**What this rules out.** `pgscan_direct` and `allocstall` at exactly zero for the
+whole window means no allocation ever had to reclaim in the caller's context. A
+taller watermark cannot prevent a stall that is not happening, which is the
+third independent reason `46128b05a` was reverted (see `5d78169f7`).
+
+**What it does not explain.** "Slow after idle" is still unaccounted for. The
+kernel's own stall counters are flat, so the next honest step is to sample while
+it is happening rather than from a quiet phone - the phone also has to be
+observed, not just the kernel: an app burning 11.5% CPU during an "idle" sample
+is a better explanation than any tunable on this list.
+
+**Two writers settled, one still not.** `/system/etc/init/hw/init.rc:372` writes
+`hung_task_timeout_secs 0` and line 371 writes `panic_on_oops 1`; nothing else on
+the ROM writes either. But no rc file, no post-boot script, no module and no
+`/proc/cmdline` argument writes `kernel.panic`, and the cmdline carries no
+`panic=` (only `kernel.panic_on_rcu_stall=1`), so the live `panic 0` against
+`CONFIG_PANIC_TIMEOUT=5` still has no identified author. It is written after
+kernel init or not at all; a module write at `boot_completed` outranks anything
+from init either way.
