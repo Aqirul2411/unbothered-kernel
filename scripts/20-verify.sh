@@ -175,11 +175,13 @@ esac
 # is the previous release. That shipped once as "5.10.273" and cost a night of
 # chasing a phantom, so it must not be possible to ship again.
 #
-# Two checks, both cheap:
-#   1. a per-release marker that only exists in that release's code
-#   2. a generic "the pinned tree changed more than the Makefile" test
-# When no marker is recorded for a version the check degrades to a warning and
-# the size test, never to a silent pass.
+# One check, and it is precise: a per-release marker that only exists in that
+# release's code. A "changed more than the Makefile" heuristic was tried first
+# and misfired on honest label commits, so it is gone: a heuristic that cries
+# wolf on a correct tree is worse than no heuristic.
+#
+# When no marker is recorded for a version the check says so out loud, and takes
+# the string on trust - never a silent pass.
 KSRC="${KSRC:-$ROOT/work/ksrc}"
 if [ -f "$KSRC/Makefile" ]; then
   CLAIMED="$(awk -F' = ' '/^VERSION =/{v=$2} /^PATCHLEVEL =/{p=$2} /^SUBLEVEL =/{s=$2} END{print v"."p"."s}' "$KSRC/Makefile" 2>/dev/null || true)"
@@ -200,14 +202,7 @@ if [ -f "$KSRC/Makefile" ]; then
         die "the tree claims $CLAIMED but does not contain $CLAIMED's code ($MARKER missing from $MARKER_FILE). That is a version-string bump, not that release."
       fi
     else
-      warn "no version marker recorded for $CLAIMED, checking the tree instead"
-    fi
-    if git -C "$KSRC" rev-parse -q --verify HEAD >/dev/null 2>&1; then
-      CHANGED="$(git -C "$KSRC" diff --name-only HEAD^ HEAD 2>/dev/null | wc -l || echo 0)"
-      ONLY_MAKEFILE="$(git -C "$KSRC" diff --name-only HEAD^ HEAD 2>/dev/null | tr '\n' ' ' || true)"
-      if [ "$CHANGED" -le 1 ] && [ "$ONLY_MAKEFILE" = "Makefile " ]; then
-        die "the pinned tree changes only Makefile - that cannot be a new stable release"
-      fi
+      warn "no version marker recorded for $CLAIMED, the string is taken on trust"
     fi
   fi
 fi
