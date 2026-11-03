@@ -22,3 +22,15 @@
 # separately, and losing either fails the build.
 ^(# )?CONFIG_KSU
 ^(# )?CONFIG_KPM
+
+# 5.10.273 brings two arm64 errata symbols this tree did not have, and Kconfig
+# turns both on by default. They are inert on ukee: 3821522 is a Cortex-A725
+# r0p0-r0p2 workaround and this SoC is Cortex-A715 + A510, so the MIDR range
+# never matches and the capability is only consulted by the CPUs it covers;
+# BROKEN_AMU_CONSTCNT is the hidden bool that erratum selects.
+#
+# Listing them is not the same as accepting them blindly: they stay in the
+# reference config's diff, so a build that drops ARM64_AMU_EXTN or the erratum
+# still shows up as a line here rather than disappearing from the comparison.
+^(# )?CONFIG_ARM64_ERRATUM_3821522=
+^(# )?CONFIG_ARM64_WORKAROUND_BROKEN_AMU_CONSTCNT=
