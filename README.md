@@ -196,7 +196,17 @@ public, keep the attribution.
 
 **Status: BOOTS.** `unbothered.zip` was flashed on the device and the phone
 booted (2026-10-30). The root stack is KernelSU-Next + SUSFS at the dev-susfs
-tip, kernel name `Unbothered`, version `5.10.272`.
+tip, kernel name `Unbothered`.
+
+The kernel on the phone as of 2026-11-03 is `5.10.272-Unbothered/5d78169f7-diag`
+(build 41459262575), the build that ran overnight without a fault. `5.10.273`
+(build 41558629375, kernel `159d9aac6`) merged Greg KH's real stable tag, passed
+verification the same way - 39 accepted config lines, 0 significant bytes, KSU
+block identical - and is the one waiting to be flashed; see `docs/TUNING.md` for
+what is in the merge and `Desktop\Unbothered\STATUS.txt` for the hashes.
+
+The two runs below are the original proof that the pipeline is sound, at
+5.10.272. They are kept as written.
 
 Two builds passed verification against the config extracted from the phone.
 

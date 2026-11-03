@@ -689,3 +689,102 @@ would justify touching a watermark again.
 task ever sits in D-state for five minutes this reboots the phone by design. If
 that ever happens randomly, `WATCHDOG=0` in `/data/adb/unbothered-tune.conf` and
 a reboot puts it back the way the ROM shipped it.
+
+### 5.10.273: the first real stable merge, and the relabel it had to avoid (2026-11-03)
+
+`Unbothered 5.10.273 | build 41558629375`, kernel `159d9aac6`, `-diag`.
+497 files, `+5379 -2607`, 517 upstream commits, 18 conflicted files resolved by
+hand. Config: 39 accepted diffs against the phone's reference, 0 significant
+bytes, KSU block identical. Vermagic
+`5.10.273-Unbothered/159d9aac6-diag SMP preempt mod_unload modversions aarch64`.
+
+**First, the branch that looked already done.** `Arkael-Dev/arkael-bore` and
+`arkael-linux-stable` both carried a commit named "Linux 5.10.273" (`4744cb4c07`).
+It changes one file: `Makefile`, `SUBLEVEL 272 -> 273` (`+1 -1`), and its parent
+is our own `2e6a0ef64`. That is a relabel, not a release: merging it would have
+put "5.10.273" in the version string with none of the 517 commits behind it. The
+same check was applied to what we already had: our 5.10.272 is Greg KH's own
+`aca95a35f`, brought in by AOSP's `a1eed2e9c "Merge 5.10.272 into
+android12-5.10-lts"`, not Arkael's re-created `487e5f5d7`. So the merge target
+was `v5.10.273` -> `f23b568f7597`, and `git merge-base` confirmed the base is
+exactly `aca95a35f`: one stable release, nothing older riding along.
+
+**How it was merged without a worktree.** This tree cannot be checked out on
+Windows: `drivers/gpu/drm/nouveau/nvkm/subdev/i2c/aux.c` is a reserved device
+name, and a checkout is 1.5 GB. `git merge-tree --write-tree` produced the tree
+and the conflict list in five seconds; the three sides of each conflict came out
+with `git show`, and the result was assembled with `git read-tree` + a temporary
+`GIT_INDEX_FILE` and `core.protectNTFS=false`. No per-blob checkout, no 1.5 GB.
+
+**The rule that decided most of the 25 conflicted hunks.** Where 5.10.273
+changed a type or a signature, the side matching the auto-merged header is the
+only side that can compile, so that side wins and our backport keeps its own
+logic on top:
+
+- `net->net_cookie` became `u64 ... /* written once */`; `net/core/filter.c` and
+  `net/core/net_namespace.c` take upstream, dropping our `atomic64` accessors.
+- `fwnode_irq_get`'s definition in `drivers/base/property.c` is non-const here,
+  so `include/linux/property.h` keeps our non-const declaration and takes
+  upstream's `DEFINE_FREE(fwnode_handle, ...)` that the rewritten `property.c`
+  needs. `property.c` itself takes upstream: its fix is a real infinite loop in
+  `fwnode_for_each_child_node()`.
+- `hci_dev.name` is `char[8]` in this tree, so `net/bluetooth/hci_core.c` keeps
+  our `snprintf`; upstream's `dev_set_name()`/`dev_name()` assignment does not
+  compile against an array, and our `snprintf` cannot fail, so upstream's new
+  `ida_free` path is not needed.
+- `struct f2fs_gc_kthread` is embedded in `f2fs_sb_info` now, so `fs/f2fs/gc.c`
+  takes upstream's shape while keeping the `fggc_wq` our GC_MERGE option uses.
+
+Where both sides added something unrelated, both stay: the arm64 Kconfig errata
+runs (ours' TSB block, upstream's AMU block), both `mm/fault.c` includes, and the
+nfsd create fixes alongside our mount-taking `nfsd4_setup_inter_ssc`.
+
+**Our backports stay, upstream's fix goes on top.** f2fs keeps
+`f2fs_down_write`/`f2fs_up_write` and gains upstream's writeback error check;
+the Android tcpm vendor hook keeps its place and only follows upstream's helper
+rename; the oneshot-wakeup broadcast device keeps both blocks inside upstream's
+new locking, which plugs a clockevents replacement race; `__vma_merge` keeps its
+`anon_vma_name` arguments and takes upstream's MREMAP_DONTUNMAP self-merge guard.
+
+**arm64 capability numbering is not upstream's.** 5.10.273 replaced the
+Cortex-A510 2457168 capability with `ARM64_WORKAROUND_BROKEN_AMU_CONSTCNT`.
+Upstream puts it at 60; here 60 is `ARM64_KVM_PROTECTED_MODE`, because our errata
+backports (LDAPR, TSB flush failure) shifted the numbering. Renaming the entry we
+already had at 63 is the only assignment that does not collide.
+
+**Three files merged cleanly and still would not have compiled.** The f2fs embed
+is mechanical across `fs/f2fs/{segment,sysfs}.c` (`gc_thread->` becomes
+`gc_thread.`) and the struct in `f2fs.h`, and none of those were conflicts. They
+are corrected as part of the same commit, because "git merged it" is not the same
+as "it builds".
+
+**Then the build found the one caller nobody had looked at.** The first build of
+the merge failed on
+`net/core/sock.c:1627:27: error: incompatible pointer types passing 'u64 *' to
+parameter of type 'const atomic64_t *'`: `SO_NETNS_COOKIE` still read the cookie
+with `atomic64_read()`. `sock.c` never conflicted, so no resolution covered it.
+Rather than rewrite an already-published merge commit, the fix shipped as its own
+commit, `159d9aac6`, with the compiler error quoted in its message.
+
+**Two things the config gate was right to stop.** The second build failed on
+config, not code: 5.10.273 adds `CONFIG_ARM64_ERRATUM_3821522` (Cortex-A725
+r0p0-r0p2, default y) and the hidden `CONFIG_ARM64_WORKAROUND_BROKEN_AMU_CONSTCNT`
+it selects. ukee is Cortex-A715 + A510, so the MIDR range never matches and
+neither is ever consulted; both are listed explicitly in
+`configs/verify-allow.txt` with that reasoning rather than silenced. The third
+build failed on vermagic because `EXPECTED_LINUX_VERSION` still said 5.10.272;
+that value is our own version (vermagic, Telegram headline, watch-lts), so it
+moved, while `EXPECTED_VERMAGIC`/`EXPECTED_LOCALVERSION` - the vendor fingerprint
+`IDENTITY=repro` reproduces - deliberately did not. The installer banner is a
+static file, so it moved too.
+
+**What is unmeasured.** The merge itself. Every individual tune on this phone was
+argued from a counter or a reproduction; a 517-commit stable update cannot be,
+because each commit is somebody else's fix for a report we do not have. The
+evidence that it is safe is the series it came from (the update immediately after
+the 5.10.272 the phone already ran), the config gate passing with only the two
+inert errata symbols, and the fact that none of our behaviour - watermark 10,
+MGLRU absent, HZ 250, watchdogs, KernelSU pin - was touched to make it fit. What
+remains is whether it boots twice and feels normal, which is a phone and a
+person, not a log. `unbothered-5d78169f7-diag.zip` is the rollback and is exactly
+the build that was on the phone all night.

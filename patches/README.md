@@ -103,3 +103,13 @@ with a full re-verification.
 net core and the timer broadcast path: exactly the places where a subtle
 mismatch shows up minutes or days later, on a phone that is somebody's daily
 driver.
+
+**Update, 2026-11-03: merged anyway, but not as a patch.** The rejects above are
+a property of applying a *textual* patch from a vanilla kernel. A three-way git
+merge is a different operation: it has the real common ancestor (`aca95a35f`,
+Greg KH's 5.10.272) and can see which side changed what, so the same 18 files
+become 25 hunks with two labelled sides instead of 17 failures. That is what
+shipped: `cf28e890d` merges `v5.10.273` (`f23b568f7597`), with `159d9aac6` on top
+for the one `net_cookie` caller the merge could not see. Every conflict decision
+is written down in `docs/TUNING.md`. The rule that stands: a stable release comes
+in through git history, never through `patch -p1`.
