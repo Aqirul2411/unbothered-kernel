@@ -80,7 +80,7 @@ for cand in "$WORK/unbothered.zip" "$(ls -1t "$WORK"/*.zip 2>/dev/null | head -n
 done
 RELEASE_FILE="$WORK/ksrc/include/config/kernel.release"
 RELEASE="$(cat "$RELEASE_FILE" 2>/dev/null || echo "$EXPECTED_LINUX_VERSION-$KERNEL_NAME/${KERNEL_SHA:0:9}")"
-# The name the person recognises: "Unbothered 5.10.272". The run number and the
+# The name the person recognises: "Unbothered 5.10.273". The run number and the
 # full localversion are still in the body, but the headline is the kernel.
 VER="${EXPECTED_LINUX_VERSION:-$RELEASE}"
 
