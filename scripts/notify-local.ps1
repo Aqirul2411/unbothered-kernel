@@ -48,9 +48,13 @@ if ($headBranch -match '^build-(.+)$') {
   }
   # Keep this run's pins, then run the notifier from the branch we started on:
   # the version on the run's branch can be older than the fixes made since.
+  # $tmp does not exist yet at this point, and $pinsFile must be repointed, or
+  # the subject lookup below reads the branch we just checked out instead.
+  New-Item -ItemType Directory -Force -Path $tmp | Out-Null
   $env:PINS_FILE = Join-Path $tmp "pins-run.env"
-  Copy-Item $pinsFile $env:PINS_FILE -Force
+  Copy-Item -LiteralPath $pinsFile -Destination $env:PINS_FILE -Force
   & $gitExeN -C $root checkout -q $startBranch 2>$null
+  $pinsFile = $env:PINS_FILE
   Write-Host "[notify] branch $headBranch, pins match (notifier from $startBranch)"
 } else {
   Write-Host "[notify] run $Run has no build-* branch ($headBranch); using the working tree as-is"
