@@ -25,6 +25,30 @@ $tmp  = Join-Path $env:TEMP "opencode\notify-$Run"
 if (-not (Test-Path $TokenFile)) { throw "no token at $TokenFile" }
 $token = (Get-Content $TokenFile -Raw).Trim()
 
+# The changelog names the build from configs/pins.env, so pins.env has to
+# describe THIS run. On 2026-11-05 the 1906 build was announced as
+# "ca79039ed-hz300" - the previous build's label - because the caller had left
+# the previous build branch checked out. The zip and its sha256 were correct and
+# the headline belonged to another kernel: the exact class of lie this notifier
+# exists to prevent. So the branch is derived from the run, never hardcoded.
+$gitExeN = "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe"
+$runInfo = & gh api "repos/Aqirul2411/unbothered-kernel/actions/runs/$Run" | ConvertFrom-Json
+$headBranch = $runInfo.head_branch
+if ($headBranch -match '^build-(.+)$') {
+  & $gitExeN -C $root fetch -q origin $headBranch 2>$null
+  & $gitExeN -C $root checkout -q -B $headBranch "origin/$headBranch" 2>$null
+  if ($LASTEXITCODE -ne 0) { & $gitExeN -C $root checkout -q $headBranch }
+  $pinsFile = Join-Path $root 'configs/pins.env'
+  $kb = (Select-String -LiteralPath $pinsFile -Pattern '^KERNEL_BRANCH="([^"]+)"' |
+           Select-Object -First 1).Matches[0].Groups[1].Value
+  if ("build-$kb" -ne $headBranch) {
+    throw "pins.env says KERNEL_BRANCH=$kb but run $Run is $headBranch - refusing to mislabel the message"
+  }
+  Write-Host "[notify] branch $headBranch, pins match"
+} else {
+  Write-Host "[notify] run $Run has no build-* branch ($headBranch); using the working tree as-is"
+}
+
 # Fresh download every time: a cached artifact from the previous run is exactly
 # the mistake this is meant to avoid.
 Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue
