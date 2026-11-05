@@ -175,7 +175,33 @@ CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
-# 8. Diagnostics: make the next hang leave a record.
+# 8. Diagnostics: taken back out on 2026-11-05.
+#
+# These four shipped into 1840 and 1906 - daily-driver builds - because they
+# were added while chasing the 5.10.273 boot freeze and nobody took them out
+# again. Read from 1906's own Image:
+#
+#   CONFIG_SOFTLOCKUP_DETECTOR=y
+#   CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y     <- CPU stuck 20s -> panic+reboot
+#   CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y      <- task stuck 120s -> panic+reboot
+#
+# Two reasons that is wrong for a phone someone carries:
+#
+#   - it reboots itself on a hang instead of recovering, where the previous
+#     kernel (Arkael) shipped the detector off and PANIC_TIMEOUT=-1;
+#   - the softlockup detector is a per-CPU kthread woken by an hrtimer every
+#     4s. Eight CPUs, on the little cluster, and it is a plain kthread, so
+#     WQ_POWER_EFFICIENT does not apply: roughly two idle exits per second all
+#     night, which is the one thing that keeps a cluster out of deep idle.
+#
+# PANIC_TIMEOUT stays: with the two panicking BOOTPARAM lines gone it only
+# applies to a genuine kernel panic, where rebooting beats lying there dead.
+#
+# Trade-off, stated plainly: no watchdog means a future freeze leaves no
+# pstore record. That is the right trade for a driver; it was the wrong trade
+# for a debugging session, and this file had them confused.
+#
+# The original reasoning is kept below because it was correct for its purpose.
 #
 # A hang that leaves no log is not a test, it is a coin flip. 41fac00aa froze
 # right after the PIN and produced nothing usable: PSTORE, PSTORE_RAM and
@@ -214,10 +240,10 @@ CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
 # refused the build - which is the guard working as intended, since a symbol
 # nobody asked for is exactly what a config allowlist exists to catch.
 # ---------------------------------------------------------------------------
-CONFIG_LOCKUP_DETECTOR=y
-CONFIG_SOFTLOCKUP_DETECTOR=y
-CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
-CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
+# CONFIG_LOCKUP_DETECTOR is not set
+# CONFIG_SOFTLOCKUP_DETECTOR is not set
+# CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC is not set
+# CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
 CONFIG_PANIC_TIMEOUT=5
 # ---------------------------------------------------------------------------
 # 9. KSM off: the device's own defconfig does not build it either.
