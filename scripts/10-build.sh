@@ -247,7 +247,20 @@ edit("tuning fragment",
          # the day an injector starts setting some other symbol we care about.
          'if [ -f "$WORKDIR/tuning.fragment" ]; then',
          '  log "Re-applying tuning after the injectors (last word)..."',
-         '  cat "$WORKDIR/tuning.fragment" >> "$KSRC/.config"',
+         # Append to the .config kbuild generated in the OUTPUT directory, not
+         # $KSRC/.config: this build compiles out-of-tree ($WORKDIR/out), and a
+         # .config inside the source tree makes the very next make abort with
+         # "The source tree is not clean, please run 'make ARCH=arm64 mrproper'".
+         '  _cfg="$WORKDIR/out/.config"',
+         '  if [ ! -f "$_cfg" ]; then',
+         '    _cfg=$(find "$WORKDIR" -maxdepth 2 -name .config -not -path "$WORKDIR/ksrc/*" 2>/dev/null | head -1)',
+         '  fi',
+         '  if [ -z "${_cfg:-}" ] || [ ! -f "$_cfg" ]; then',
+         '    echo "ERROR: could not find the generated .config under $WORKDIR" >&2',
+         '    exit 1',
+         '  fi',
+         '  log "Re-applying to $_cfg"',
+         '  cat "$WORKDIR/tuning.fragment" >> "$_cfg"',
          '  make ${MAKE_ARGS[@]} olddefconfig',
          'fi',
      ]))

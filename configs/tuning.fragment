@@ -213,7 +213,6 @@ CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
 CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
 CONFIG_PANIC_TIMEOUT=5
 # ---------------------------------------------------------------------------
-<<<<<<< Updated upstream
 # 9. KSM off: the device's own defconfig does not build it either.
 #
 # This is the last symbol where we differed from the vendor tree for marble
@@ -230,7 +229,7 @@ CONFIG_PANIC_TIMEOUT=5
 # Revert: delete the line. It cannot affect boot either way.
 # ---------------------------------------------------------------------------
 # CONFIG_KSM is not set
-=======
+# ---------------------------------------------------------------------------
 # 10. Make TEO the idle governor by removing the only competitor.
 #
 # The util-aware TEO in this kernel was dormant. Selection at boot is: if the
@@ -253,4 +252,3 @@ CONFIG_PANIC_TIMEOUT=5
 #   delete these lines, rebuild, and menu is back.
 # ---------------------------------------------------------------------------
 # CONFIG_CPU_IDLE_GOV_MENU is not set
->>>>>>> Stashed changes
