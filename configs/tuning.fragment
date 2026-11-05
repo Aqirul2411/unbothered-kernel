@@ -212,3 +212,20 @@ CONFIG_SOFTLOCKUP_DETECTOR=y
 CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
 CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
 CONFIG_PANIC_TIMEOUT=5
+# ---------------------------------------------------------------------------
+# 9. KSM off: the device's own defconfig does not build it either.
+#
+# This is the last symbol where we differed from the vendor tree for marble
+# (Pzqqt's marble_defconfig: "# CONFIG_KSM is not set"). KSM merges identical
+# pages across processes by scanning them continuously; on a phone with zram the
+# memory it saves is already saved more cheaply, and the scanner's CPU time is
+# paid on every screen-on minute whether or not anything is deduplicated.
+#
+# It is harmless while nothing enables it (the thread sleeps until
+# /sys/kernel/mm/ksm/run is written), which is why this is a small change and
+# not a claim: with the symbol gone, a ROM or module cannot switch the scanner
+# on by accident, and the phone matches the config its own vendor ships.
+#
+# Revert: delete the line. It cannot affect boot either way.
+# ---------------------------------------------------------------------------
+# CONFIG_KSM is not set
