@@ -21,6 +21,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $tmp  = Join-Path $env:TEMP "opencode\notify-$Run"
+$gitExeN = "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe"
+$startBranch = (& $gitExeN -C $root rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1)
+if ($startBranch) { $startBranch = $startBranch.Trim() }
 
 if (-not (Test-Path $TokenFile)) { throw "no token at $TokenFile" }
 $token = (Get-Content $TokenFile -Raw).Trim()
@@ -31,7 +34,6 @@ $token = (Get-Content $TokenFile -Raw).Trim()
 # the previous build branch checked out. The zip and its sha256 were correct and
 # the headline belonged to another kernel: the exact class of lie this notifier
 # exists to prevent. So the branch is derived from the run, never hardcoded.
-$gitExeN = "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe"
 $runInfo = & gh api "repos/Aqirul2411/unbothered-kernel/actions/runs/$Run" | ConvertFrom-Json
 $headBranch = $runInfo.head_branch
 if ($headBranch -match '^build-(.+)$') {
@@ -117,3 +119,12 @@ Push-Location $root
 try { & $bash "./scripts/30-notify.sh" } finally { Pop-Location }
 
 Remove-Item Env:\TELEGRAM_BOT_TOKEN -ErrorAction SilentlyContinue
+
+# Leave the tree where it was. A checkout left behind on a build-* branch is how
+# the KSM fix and two notifier fixes were committed somewhere no fire could see.
+try {
+  if ($startBranch -and $startBranch -ne 'HEAD') {
+    & $gitExeN -C $root checkout -q $startBranch 2>$null
+    Write-Host "[notify] working tree back on $startBranch"
+  }
+} catch { }
