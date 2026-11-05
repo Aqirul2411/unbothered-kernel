@@ -27,18 +27,25 @@
 # CONFIG_DEBUG_EFI is not set
 
 # ---------------------------------------------------------------------------
-# 2. Timer frequency: 250 Hz instead of 300.
+# 2. Timer frequency: 300 Hz, the tree's own value.
 #
-# The tree gets 300 from Arkael's inject_ksu script. Both kernels we analysed
-# chose 250: SilverCore (vendor tree, 2023) and GrayRavens (same GKI base, 2026).
-# 250 is 17% fewer timer interrupts per second, which is a real idle cost - the
-# scheduler, RCU and timekeeping all run on that tick.
+# This was 250 and the reason given was idle cost ("17% fewer timer
+# interrupts"). That reason was wrong for this kernel: CONFIG_NO_HZ_IDLE is
+# set, so the tick is stopped completely when the CPU is idle. HZ therefore
+# costs essentially nothing on standby, and only sets the granularity of
+# timers and scheduler ticks while the screen is awake and animating.
 #
-# It is also the only runtime change in this file, which is the point: one
-# change per flash, so the next measurement has one explanation.
+# At 250 Hz a tick lands every 4.0 ms. Android paces frames at 8.33 ms (120 Hz)
+# and 16.7 ms (60 Hz), so a wakeup can be quantised up to 4 ms late - enough to
+# miss a frame and be seen as a stutter in an animation. 300 Hz brings that to
+# 3.3 ms. This is the one runtime default we changed that can plausibly affect
+# how smooth the UI feels, so it is the first thing to flip back if 300 Hz
+# drains worse than it feels better.
+#
+# Revert: change both lines back to 250.
 # ---------------------------------------------------------------------------
-CONFIG_HZ_250=y
-CONFIG_HZ=250
+CONFIG_HZ_300=y
+CONFIG_HZ=300
 # CONFIG_HZ_300 is not set
 
 # ---------------------------------------------------------------------------
