@@ -237,6 +237,19 @@ edit("tuning fragment",
          '  cat "$WORKDIR/tuning.fragment" >> "$KSRC/arch/arm64/configs/gki_defconfig"',
          'fi',
          'make ${MAKE_ARGS[@]} $KERNEL_DEFCONFIG',
+         # The injector scripts shipped by the build system write symbols into
+         # the defconfig as well, and they run after the step above. That made
+         # this fragment's "last word on each symbol" claim false: CONFIG_KSM
+         # stayed =y here even though the fragment says "# CONFIG_KSM is not
+         # set", because the injector's line came later and kconfig takes the
+         # last one. Re-applying the fragment to the generated .config, and
+         # regenerating once more, makes the claim true - and it keeps working
+         # the day an injector starts setting some other symbol we care about.
+         'if [ -f "$WORKDIR/tuning.fragment" ]; then',
+         '  log "Re-applying tuning after the injectors (last word)..."',
+         '  cat "$WORKDIR/tuning.fragment" >> "$KSRC/.config"',
+         '  make ${MAKE_ARGS[@]} olddefconfig',
+         'fi',
      ]))
 
 # the defconfig injection scripts, pulled from GitHub at build time by default.
