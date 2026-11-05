@@ -46,7 +46,12 @@ if ($headBranch -match '^build-(.+)$') {
   if ("build-$kb" -ne $headBranch) {
     throw "pins.env says KERNEL_BRANCH=$kb but run $Run is $headBranch - refusing to mislabel the message"
   }
-  Write-Host "[notify] branch $headBranch, pins match"
+  # Keep this run's pins, then run the notifier from the branch we started on:
+  # the version on the run's branch can be older than the fixes made since.
+  $env:PINS_FILE = Join-Path $tmp "pins-run.env"
+  Copy-Item $pinsFile $env:PINS_FILE -Force
+  & $gitExeN -C $root checkout -q $startBranch 2>$null
+  Write-Host "[notify] branch $headBranch, pins match (notifier from $startBranch)"
 } else {
   Write-Host "[notify] run $Run has no build-* branch ($headBranch); using the working tree as-is"
 }

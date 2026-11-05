@@ -18,7 +18,11 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null
-source "$ROOT/configs/pins.env"
+# Which build's pins to describe, if the caller knows better than this tree.
+# notify-local sends a finished CI run, whose pins live on that run's branch;
+# without this the notifier would describe whichever branch happens to be
+# checked out - once announcing the 1906 build as the 1840 one.
+source "${PINS_FILE:-$ROOT/configs/pins.env}"
 # shellcheck source=/dev/null
 source "$ROOT/configs/identity.env"
 
