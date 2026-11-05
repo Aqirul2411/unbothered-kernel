@@ -114,6 +114,17 @@ patches="$(grep -oE 'Applying source patch [^ ]+' "$WORK/build.log" 2>/dev/null 
 
 config_changed="$(sed -n '1,28p' "$WORK/verify/config.changed" 2>/dev/null || true)"
 
+# The lines that actually differ, from the verifier's diff of the built Image's
+# config against the phone's. This exists because the message above once named
+# only the pinned kernel commit, so a build whose real change was "CONFIG_HZ
+# 250 -> 300" announced "cpuidle: teo: introduce util-awareness" instead: a
+# correct sentence about the wrong thing. The diff cannot say that.
+cfg_lines="$(grep -E '^[-+](# )?CONFIG_' "$WORK/verify/config.changed" 2>/dev/null | head -10 || true)"
+
+# Tuning commits of the build repository, when notify-local supplies them: the
+# fragment is where the decisions live, and no kernel-commit subject shows it.
+tuning_lines="${TUNING_SUBJECTS:-}"
+
 # --- send ------------------------------------------------------------------
 # Plain text on purpose: Markdown eats the underscores in symbol names, and a
 # changelog whose CONFIG_HZ_250 becomes italic is a changelog nobody trusts.
@@ -165,8 +176,10 @@ if [ -n "$ZIP" ] && [ -f "$ZIP" ] && [ -s "$WORK/verify/config.changed" ]; then
 
 what changed
 $(printf '%s\n' "$commits" | sed 's/^/  | /')
+$(if [ -n "$tuning_lines" ]; then printf '%s\n' "$tuning_lines" | sed 's/^/  | /'; fi)
 
 config vs the phone: $n lines, significant diff ${sig} bytes
+$(if [ -n "$cfg_lines" ]; then printf '%s\n' "$cfg_lines" | sed 's/^/  /'; fi)
 file   $(basename "$ZIP")  $(( $(stat -c '%s' "$ZIP") / 1000000 )) MB
 sha256 $zip_sha
 

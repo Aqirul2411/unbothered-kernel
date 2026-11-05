@@ -74,6 +74,15 @@ try {
   Write-Host "[notify] kernel subject lookup failed, the zip hash stands in: $_"
 }
 
+# The tuning decisions live in this repository, not in the kernel commit, so
+# pass their subjects to 30-notify.sh: a config-only build must not announce
+# itself with the pinned commit's subject and nothing else.
+try {
+  $gitExe0 = "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe"
+  $tuning = & $gitExe0 -C $root log -3 --format='%s' -- configs/tuning.fragment 2>$null
+  if ($tuning) { $env:TUNING_SUBJECTS = ($tuning -join "`n") }
+} catch { }
+
 $bash = "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe"
 $env:TELEGRAM_BOT_TOKEN = $token
 $env:TELEGRAM_CHAT_ID   = $ChatId
