@@ -36,6 +36,7 @@ $token = (Get-Content $TokenFile -Raw).Trim()
 # exists to prevent. So the branch is derived from the run, never hardcoded.
 $runInfo = & gh api "repos/Aqirul2411/unbothered-kernel/actions/runs/$Run" | ConvertFrom-Json
 $headBranch = $runInfo.head_branch
+$pinsFile = Join-Path $root 'configs/pins.env'
 if ($headBranch -match '^build-(.+)$') {
   & $gitExeN -C $root fetch -q origin $headBranch 2>$null
   & $gitExeN -C $root checkout -q -B $headBranch "origin/$headBranch" 2>$null
@@ -48,13 +49,17 @@ if ($headBranch -match '^build-(.+)$') {
   }
   # Keep this run's pins, then run the notifier from the branch we started on:
   # the version on the run's branch can be older than the fixes made since.
-  # $tmp does not exist yet at this point, and $pinsFile must be repointed, or
-  # the subject lookup below reads the branch we just checked out instead.
-  New-Item -ItemType Directory -Force -Path $tmp | Out-Null
-  $env:PINS_FILE = Join-Path $tmp "pins-run.env"
-  Copy-Item -LiteralPath $pinsFile -Destination $env:PINS_FILE -Force
+  # $pinsFile must be repointed, or the subject lookup below reads whichever
+  # branch we happen to be on rather than the one that was compiled.
+  #
+  # The copy must NOT go under $tmp: the "fresh download every time" block
+  # below deletes that directory wholesale, which silently removed the file and
+  # made the notifier announce the wrong build's commit again.
+  $pinsRun = Join-Path $env:TEMP "opencode\pins-run-$Run.env"
+  Copy-Item -LiteralPath $pinsFile -Destination $pinsRun -Force
   & $gitExeN -C $root checkout -q $startBranch 2>$null
-  $pinsFile = $env:PINS_FILE
+  $env:PINS_FILE = $pinsRun
+  $pinsFile = $pinsRun
   Write-Host "[notify] branch $headBranch, pins match (notifier from $startBranch)"
 } else {
   Write-Host "[notify] run $Run has no build-* branch ($headBranch); using the working tree as-is"
@@ -83,7 +88,7 @@ Copy-Item "$($art.FullName)\*" $work -Recurse -Force
 # the commit pinned in configs/pins.env and hand it over as the one line the
 # script reads. If the lookup fails, the honest fallback still applies.
 try {
-  $pins = Join-Path $root "configs/pins.env"
+  $pins = $pinsFile
   $sha  = (Select-String -LiteralPath $pins -Pattern '^KERNEL_SHA="([0-9a-f]{40})"' |
              Select-Object -First 1).Matches[0].Groups[1].Value
   $krepo = (Select-String -LiteralPath $pins -Pattern '^KERNEL_REPO=".*/([^/"]+)\.git"' |
@@ -112,10 +117,13 @@ try {
 # The tuning decisions live in this repository, not in the kernel commit, so
 # pass their subjects to 30-notify.sh: a config-only build must not announce
 # itself with the pinned commit's subject and nothing else.
+$ref = if ($headBranch) { "origin/$headBranch" } else { "" }
 try {
   $gitExe0 = "$env:LOCALAPPDATA\Programs\Git\cmd\git.exe"
-  $tuning = & $gitExe0 -C $root log -3 --format='%s' -- configs/tuning.fragment 2>$null
-  if ($tuning) { $env:TUNING_SUBJECTS = ($tuning -join "`n") }
+  $tuning = $null
+  if ($ref) { $tuning = & $gitExe0 -C $root log -3 --format='%s' $ref -- configs/tuning.fragment 2>$null }
+  if (-not $tuning) { $tuning = & $gitExe0 -C $root log -3 --format='%s' -- configs/tuning.fragment 2>$null }
+  if ($tuning) { $env:TUNING_SUBJECTS = ($tuning -join "`n") } else { Remove-Item Env:\TUNING_SUBJECTS -ErrorAction SilentlyContinue }
 } catch { }
 
 $bash = "$env:LOCALAPPDATA\Programs\Git\bin\bash.exe"
