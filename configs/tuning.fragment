@@ -114,25 +114,33 @@ CONFIG_TCP_CONG_BBRPLUS=y
 CONFIG_NET_SCH_CAKE=y
 
 # ---------------------------------------------------------------------------
-# 6. Power-efficient workqueues: let unbound work run where a core is awake.
+# 6. Power-efficient workqueues: tried, and backed out on 2026-11-09.
 #
-# Unset in our config and in the phone's. What it does: workqueues that opt in
-# with WQ_POWER_EFFICIENT - and the two system-level ones - stop being pinned to
-# the CPU that queued the work and are handed to the scheduler, which can pick a
-# core that is already awake instead of waking an idle one.
+# What it does: workqueues that opt in with WQ_POWER_EFFICIENT - and the two
+# system-level ones - stop being pinned to the CPU that queued the work and are
+# handed to the scheduler, which can pick a core that is already awake instead
+# of waking an idle one.
 #
-# Why it matters on a phone: waking a sleeping core for a short work item pays
-# the wake cost and the idle-state exit for work that a busy core could absorb.
-# LWN's write-up of the feature quotes "up to 15% for some use cases" on ARM and
-# Android, which is why it is worth a flash - not because 15% is a number to
-# expect here, but because it is an idle-drain lever we have never tested.
+# Why it is off now: the phone stalls for a few seconds on wake when a video app
+# (Facebook, TikTok) was left open through sleep, and then recovers by itself.
+# That happens on 2142 as well - before any of the twelve upstream fixes - and
+# it does not happen on Arkael's kernel, which has this symbol off, like Google's
+# GKI defconfig and the phone's own config. We were the only kernel in that
+# comparison that set it.
 #
-# The cost: a work item may run on a different CPU each time, so it loses warm
-# cache. That is the trade, and it is why this goes in alone.
+# That is the case for reverting it: this option changes *when* unbound work
+# runs, not how much power it costs, so it can leave a resume waiting behind a
+# worker the scheduler has not placed yet. A stall that heals on its own has
+# that shape, and no other line in our config delta can produce a delay rather
+# than a loss.
 #
-# Revert: delete this line. It cannot affect boot either way.
+# The benefit was never measured here. The "up to 15%" figure is a quote about
+# other systems, and the drain experiment that would have justified it was lost
+# when the phone went back to a known-good build.
+#
+# Revert (restore the experiment): change this back to =y.
 # ---------------------------------------------------------------------------
-CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+# CONFIG_WQ_POWER_EFFICIENT_DEFAULT is not set
 
 # ---------------------------------------------------------------------------
 # 7. MGLRU: REVERTED, do not add back without a device test.
