@@ -254,19 +254,27 @@ CONFIG_NET_SCH_CAKE=y
 # CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
 CONFIG_PANIC_TIMEOUT=5
 # ---------------------------------------------------------------------------
-# 9. KSM off: the device's own defconfig does not build it either.
+# 9. KSM: compiled in for a measured experiment, 2026-11-09.
 #
-# This is the last symbol where we differed from the vendor tree for marble
-# (Pzqqt's marble_defconfig: "# CONFIG_KSM is not set"). KSM merges identical
-# pages across processes by scanning them continuously; on a phone with zram the
-# memory it saves is already saved more cheaply, and the scanner's CPU time is
-# paid on every screen-on minute whether or not anything is deduplicated.
+# What this section said before was reasoning without a measurement: "the
+# vendor does not build it either, and zram already saves that memory more
+# cheaply". The measurement now exists, and it says the opposite of "already
+# saved cheaply":
 #
-# It is harmless while nothing enables it (the thread sleeps until
-# /sys/kernel/mm/ksm/run is written), which is why this is a small change and
-# not a claim: with the symbol gone, a ROM or module cannot switch the scanner
-# on by accident, and the phone matches the config its own vendor ships.
+#   - 19.5 minutes with the screen off: 30,764 pages/min swapped out,
+#     19,357 in, 19,802 major faults/min, zram grew 5,813 -> 6,019 MB;
+#   - the phone holds ~6 GB of an 8 GB zram device while nominally idle;
+#   - CPU is 915 of ~1600 mAh of the drain, and that CPU is this churn.
 #
-# Revert: delete the line. It cannot affect boot either way.
+# So the question is worth one build: does deduplicating identical pages across
+# the 10-20 resident apps free enough memory to reduce that churn by more than
+# the scanner costs? That is what this experiment measures, nothing else.
+#
+# Compiled in but NOT started: ksmd sleeps until something writes 1 to
+# /sys/kernel/mm/ksm/run, so flashing this kernel changes no behaviour by
+# itself. Start by hand, measure against the numbers above, stop by writing 0.
+# If it loses, set this back to "is not set".
+#
+# Revert: put back `# CONFIG_KSM is not set`.
 # ---------------------------------------------------------------------------
-# CONFIG_KSM is not set
+CONFIG_KSM=y
