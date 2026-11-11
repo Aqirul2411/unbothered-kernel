@@ -254,27 +254,30 @@ CONFIG_NET_SCH_CAKE=y
 # CONFIG_BOOTPARAM_HUNG_TASK_PANIC is not set
 CONFIG_PANIC_TIMEOUT=5
 # ---------------------------------------------------------------------------
-# 9. KSM: compiled in for a measured experiment, 2026-11-09.
+# 9. KSM: tried on 2026-11-09, measured, and put back out.
 #
-# What this section said before was reasoning without a measurement: "the
-# vendor does not build it either, and zram already saves that memory more
-# cheaply". The measurement now exists, and it says the opposite of "already
-# saved cheaply":
+# The hypothesis was worth a build: the phone held ~6 GB of an 8 GB zram device
+# while nominally idle, CPU was 915 of ~1600 mAh of the drain, and that CPU was
+# swap churn. If dedupe freed real memory, the churn should fall.
 #
-#   - 19.5 minutes with the screen off: 30,764 pages/min swapped out,
-#     19,357 in, 19,802 major faults/min, zram grew 5,813 -> 6,019 MB;
-#   - the phone holds ~6 GB of an 8 GB zram device while nominally idle;
-#   - CPU is 915 of ~1600 mAh of the drain, and that CPU is this churn.
+# Measured with CONFIG_KSM=y, ksmd started (run=1), defaults (pages_to_scan=100,
+# sleep_millisecs=20), 25 minutes, screen off:
 #
-# So the question is worth one build: does deduplicating identical pages across
-# the 10-20 resident apps free enough memory to reduce that churn by more than
-# the scanner costs? That is what this experiment measures, nothing else.
+#   run=1  full_scans=0  pages_shared=0  pages_sharing=0  pages_unshared=0
 #
-# Compiled in but NOT started: ksmd sleeps until something writes 1 to
-# /sys/kernel/mm/ksm/run, so flashing this kernel changes no behaviour by
-# itself. Start by hand, measure against the numbers above, stop by writing 0.
-# If it loses, set this back to "is not set".
+# ksmd was alive (pid 86) and awake; it simply had nothing to scan. KSM only
+# considers VMAs that a process has explicitly marked with MADV_MERGEABLE, and
+# no process on this ROM does that. So the scanner cannot find duplicates no
+# matter how long it runs, and the swap-rate improvement seen after the reboot
+# was the reboot, not dedupe.
 #
-# Revert: put back `# CONFIG_KSM is not set`.
+# That is a property of userspace, not of this kernel: compiling the scanner in
+# buys nothing on modern Android. Reverted rather than carried as dead code.
+#
+# If it is ever revisited, the first question is not "is KSM fast enough" but
+# "does anything on this ROM call madvise(MADV_MERGEABLE)" - and the answer is
+# checkable before a single build.
+#
+# Revert: put back `CONFIG_KSM=y`.
 # ---------------------------------------------------------------------------
-CONFIG_KSM=y
+# CONFIG_KSM is not set
