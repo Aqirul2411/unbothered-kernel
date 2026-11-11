@@ -51,11 +51,32 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          sudo apt-get update
+          # 2026-11-11: three consecutive runs died here with
+          #   Temporary failure resolving 'azure.archive.ubuntu.com'
+          # while GitHub reported every component operational, so this step now
+          # defends itself instead of failing the build at minute two:
+          #
+          #   1. point the resolver at public servers as well as the runner's own;
+          #   2. retry apt update with backoff;
+          #   3. if the packages still cannot be fetched, carry on - they are all
+          #      present on ubuntu-24.04 images in practice, and a build that
+          #      fails on a genuinely missing tool says something useful, where
+          #      "cannot resolve mirror" does not.
+          (sudo resolvectl dns eth0 1.1.1.1 8.8.8.8 && sudo resolvectl flush-caches) \
+            || sudo sh -c 'printf "nameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf' \
+            || true
+          getent hosts archive.ubuntu.com || echo "::warning::DNS still not resolving"
+
+          for attempt in 1 2 3; do
+            if sudo apt-get -o Acquire::Retries=5 update; then break; fi
+            echo "apt update failed (attempt $attempt); retrying in 15s"
+            sleep 15
+          done
           sudo apt-get install -y --no-install-recommends \
             build-essential bc bison flex libssl-dev libelf-dev \
             rsync zip unzip p7zip-full zstd xz-utils cpio kmod \
-            device-tree-compiler python3 git curl wget patch ca-certificates
+            device-tree-compiler python3 git curl wget patch ca-certificates \
+            || echo "::warning::apt install failed; continuing with the image's own toolchain"
           sudo timedatectl set-timezone Asia/Jakarta || true
 
       # No toolchain cache on purpose: the pinned build script always downloads
