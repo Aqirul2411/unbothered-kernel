@@ -282,3 +282,26 @@ CONFIG_PANIC_TIMEOUT=5
 # Revert: put back `CONFIG_KSM=y`.
 # ---------------------------------------------------------------------------
 # CONFIG_KSM is not set
+
+# ---------------------------------------------------------------------------
+# 10. BORE off: none of the reference kernels run it either.
+#
+# CONFIG_SCHED_BORE is default y in this tree, which is why every build so far
+# carried it without anyone choosing it. Checked against the kernels this
+# project has actually been compared against:
+#
+#   Arkael    CONFIG_SCHED_BORE=y      the baseline called reliable, not fast
+#   abaddon   absent                   reported good
+#   templar   is not set               reported good battery
+#   Alioth    absent                   held up as a good example
+#
+# The three that were called good do not run it. BORE deliberately favours
+# interactive tasks at the expense of throughput, and the frequency governor on
+# this phone is Xiaomi's walt, not schedutil, so how the two interact here has
+# never been measured.
+#
+# Turning it off restores stock CFS behaviour for this tree. If the phone feels
+# worse under load, this line goes back and the question is settled the other
+# way.
+# ---------------------------------------------------------------------------
+# CONFIG_SCHED_BORE is not set
