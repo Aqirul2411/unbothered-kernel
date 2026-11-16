@@ -114,33 +114,34 @@ CONFIG_TCP_CONG_BBRPLUS=y
 CONFIG_NET_SCH_CAKE=y
 
 # ---------------------------------------------------------------------------
-# 6. Power-efficient workqueues: tried, and backed out on 2026-11-09.
+# 6. Power-efficient workqueues: ON again, 2026-11-17, with the stall explained.
 #
 # What it does: workqueues that opt in with WQ_POWER_EFFICIENT - and the two
 # system-level ones - stop being pinned to the CPU that queued the work and are
 # handed to the scheduler, which can pick a core that is already awake instead
 # of waking an idle one.
 #
-# Why it is off now: the phone stalls for a few seconds on wake when a video app
-# (Facebook, TikTok) was left open through sleep, and then recovers by itself.
-# That happens on 2142 as well - before any of the twelve upstream fixes - and
-# it does not happen on Arkael's kernel, which has this symbol off, like Google's
-# GKI defconfig and the phone's own config. We were the only kernel in that
-# comparison that set it.
+# History: enabled from 1840 onward, backed out on 2026-11-09 because the phone
+# stalled for a few seconds when waking with a video app left open, and a
+# stall that heals by itself looked like a workqueue delaying resume.
 #
-# That is the case for reverting it: this option changes *when* unbound work
-# runs, not how much power it costs, so it can leave a resume waiting behind a
-# worker the scheduler has not placed yet. A stall that heals on its own has
-# that shape, and no other line in our config delta can produce a delay rather
-# than a loss.
+# Why that reasoning was wrong: measured from the phone on 2026-11-09/10, the
+# same wake path was doing 30,764 pages/min swapped out and 19,802 major faults
+# per minute *with the screen off*, against 6.2 GB of an 8 GB zram device. A
+# wake has to fault those pages back in, which is seconds of stall on its own.
+# The workqueue was the nearest suspect, not the cause.
 #
-# The benefit was never measured here. The "up to 15%" figure is a quote about
-# other systems, and the drain experiment that would have justified it was lost
-# when the phone went back to a known-good build.
+# Why it matters for battery: this is the only line in our config delta that
+# exists to save power, and the two reference kernels both run it on - abaddon
+# ships CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y, so does templar.
 #
-# Revert (restore the experiment): change this back to =y.
+# The test is clean now because zram is being turned off in userspace at the
+# same time (post-fs-data.d + a service.d watchdog, since Xiaomi's
+# init.kernel.post_boot.sh re-enables swap after service.d has run). With no
+# swap to fault in, if the wake stall returns it is this option and nothing
+# else, and it goes back off permanently.
 # ---------------------------------------------------------------------------
-# CONFIG_WQ_POWER_EFFICIENT_DEFAULT is not set
+CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
 
 # ---------------------------------------------------------------------------
 # 7. MGLRU: REVERTED, do not add back without a device test.
