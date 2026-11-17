@@ -305,3 +305,21 @@ CONFIG_PANIC_TIMEOUT=5
 # way.
 # ---------------------------------------------------------------------------
 # CONFIG_SCHED_BORE is not set
+
+# ---------------------------------------------------------------------------
+# 11. Stop zeroing every heap allocation.
+#
+# CONFIG_INIT_ON_ALLOC_DEFAULT_ON makes the allocator memset every page handed
+# out, which is a hardening measure against uninitialised-memory leaks and a
+# straight cost on every allocation. Every custom kernel this project has been
+# compared against runs with it off: FleurX (same 5.10.272 base) sets it off,
+# Alioth (4.19) has the sanitizers off entirely, abaddon keeps the GKI default
+# and is the slowest of the three to touch.
+#
+# Trade, stated: a use-after-free or an uninitialised read can now expose stale
+# kernel memory instead of zeros. On a single-user phone that is a deliberate
+# trade for throughput, and it is reversible with one line.
+#
+# Revert: change this back to =y.
+# ---------------------------------------------------------------------------
+# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
