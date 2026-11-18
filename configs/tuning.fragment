@@ -304,7 +304,11 @@ CONFIG_PANIC_TIMEOUT=5
 # worse under load, this line goes back and the question is settled the other
 # way.
 # ---------------------------------------------------------------------------
-# CONFIG_SCHED_BORE is not set
+# CONFIG_SCHED_BORE=y  -- restored 2026-11-19: with it off, scrolling in
+# TikTok arrived in bursts ('images changing, no transition'). Every build
+# this phone called smooth had BORE on. The three reference kernels without
+# it are not this phone; the comparison was worth one test and the test lost.
+CONFIG_SCHED_BORE=y
 
 # ---------------------------------------------------------------------------
 # 11. Stop zeroing every heap allocation.
