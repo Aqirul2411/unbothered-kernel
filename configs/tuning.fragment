@@ -141,7 +141,12 @@ CONFIG_NET_SCH_CAKE=y
 # swap to fault in, if the wake stall returns it is this option and nothing
 # else, and it goes back off permanently.
 # ---------------------------------------------------------------------------
-CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
+# 2026-11-19 bisect: TikTok scroll lost its animation on 5.10.274, and
+# restoring BORE did not bring it back. 5.10.272 with this same config
+# (WQ off, INIT_ON_ALLOC on) was smooth, so this build puts the 274 merge
+# under that exact config. If the animation returns, the culprit is one of
+# the two config flips, not the merge; if it does not, it is the merge.
+# CONFIG_WQ_POWER_EFFICIENT_DEFAULT is not set
 
 # ---------------------------------------------------------------------------
 # 7. MGLRU: REVERTED, do not add back without a device test.
@@ -326,4 +331,4 @@ CONFIG_SCHED_BORE=y
 #
 # Revert: change this back to =y.
 # ---------------------------------------------------------------------------
-# CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
+CONFIG_INIT_ON_ALLOC_DEFAULT_ON=y
