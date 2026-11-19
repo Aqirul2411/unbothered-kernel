@@ -146,7 +146,7 @@ CONFIG_NET_SCH_CAKE=y
 # (WQ off, INIT_ON_ALLOC on) was smooth, so this build puts the 274 merge
 # under that exact config. If the animation returns, the culprit is one of
 # the two config flips, not the merge; if it does not, it is the merge.
-# CONFIG_WQ_POWER_EFFICIENT_DEFAULT is not set
+CONFIG_WQ_POWER_EFFICIENT_DEFAULT=y
 
 # ---------------------------------------------------------------------------
 # 7. MGLRU: REVERTED, do not add back without a device test.
@@ -313,7 +313,7 @@ CONFIG_PANIC_TIMEOUT=5
 # TikTok arrived in bursts ('images changing, no transition'). Every build
 # this phone called smooth had BORE on. The three reference kernels without
 # it are not this phone; the comparison was worth one test and the test lost.
-CONFIG_SCHED_BORE=y
+# CONFIG_SCHED_BORE is not set
 
 # ---------------------------------------------------------------------------
 # 11. Stop zeroing every heap allocation.
