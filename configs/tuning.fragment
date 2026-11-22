@@ -332,3 +332,28 @@ CONFIG_PANIC_TIMEOUT=5
 # Revert: change this back to =y.
 # ---------------------------------------------------------------------------
 # CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
+
+# ---------------------------------------------------------------------------
+# 12. cpuidle: AEGIS instead of TEO, from Steambot12/aegis-cpuidle.
+#
+# An energy-ledger idle governor: it decides deep-state entry from realised
+# residency rather than TEO's statistical prediction. Its author reports a
+# 10-50 mA standby band on GKI 5.10 hardware.
+#
+# AEGIS registers at rating 25, below TEO's 30, so it stays dormant unless
+# selected. Selection is by kernel argument, which keeps the old behaviour one
+# line away:
+#
+#   cpuidle.governor=aegis    -> AEGIS
+#   cpuidle.governor=teo      -> back to TEO, no rebuild
+#
+# The CONFIG_CMDLINE below is the existing string with that argument appended;
+# CMDLINE_EXTEND is on, so the bootloader's own parameters still apply.
+#
+# What to check on the device: /sys/devices/system/cpu/cpuidle/current_governor
+# must read "aegis". If a wake alarm or notification stops arriving, switch back
+# with the line above - an idle governor that mispredicts shows up as a phone
+# that does not wake, not as a warning.
+# ---------------------------------------------------------------------------
+CONFIG_CPU_IDLE_GOV_AEGIS=y
+CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protected cgroup_disable=pressure cgroup.memory=nokmem cpuidle.governor=aegis"
