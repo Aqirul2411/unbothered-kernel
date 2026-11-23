@@ -357,3 +357,25 @@ CONFIG_PANIC_TIMEOUT=5
 # ---------------------------------------------------------------------------
 CONFIG_CPU_IDLE_GOV_AEGIS=y
 CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protected cgroup_disable=pressure cgroup.memory=nokmem cpuidle.governor=aegis"
+
+# ---------------------------------------------------------------------------
+# 13. MGLRU (multi-generational LRU), with the PTE-lock inversion removed.
+#
+# History on this phone: merged, then "core only" (walks off) was sluggish after
+# hours because hot pages are never promoted, then walks on hung at the PIN.
+# The hang was not scan length - lru_gen_look_around() already clamps to
+# MIN_LRU_BATCH and bails on a contended PTL. It was lock order: the function is
+# entered with the PTE lock held and, with no reclaim walk attached, takes
+# pgdat->lru_lock underneath it, while reclaim elsewhere takes LRU -> PTL.
+#
+# The tree commit before this one promotes only from the reclaim walk, which
+# needs no LRU lock, so that inversion cannot happen. Promotion during reclaim -
+# the path that actually ages pages - is unchanged.
+#
+# Rollback without a rebuild: echo 0 > /sys/kernel/mm/lru_gen/enabled returns to
+# the stock LRU immediately; flashing ack274-aegis-sched (sched2) undoes it
+# entirely.
+# ---------------------------------------------------------------------------
+CONFIG_LRU_GEN=y
+CONFIG_LRU_GEN_ENABLED=y
+# CONFIG_LRU_GEN_STATS is not set
