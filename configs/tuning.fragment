@@ -381,19 +381,31 @@ CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protect
 # difference in vmscan.c, and without the Xiaomi page flag (PG_oem_reserved_5)
 # that this tree does not have.
 #
-# CONFIG_LRU_GEN_ENABLED is deliberately OFF. The code is compiled; the stock
-# LRU is what runs at boot, so this build behaves exactly like sched2 until
-# somebody asks otherwise. That is the difference between an experiment and a
-# brick when the build cannot be tested before it is flashed:
+# CONFIG_LRU_GEN_ENABLED is ON. Two things make that safe to boot with, and
+# neither of them is hope:
 #
-#   turn it on    echo 0x7 > /sys/kernel/mm/lru_gen/enabled
-#   check it      cat /sys/kernel/mm/lru_gen/enabled      (0x0007 = on)
-#   turn it off   echo 0    > /sys/kernel/mm/lru_gen/enabled
+#   1. tree commit b9bee4f6d9f5 disables LRU_GEN_MM_WALK (and the inert
+#      NONLEAF_YOUNG) at early_initcall, so the kernel comes up core-only
+#      instead of with every capability. The walk is the one thing this phone has
+#      never survived: with walks on it froze 15 s after the PIN on the 2022
+#      backport, and inside two minutes on the newer generation with load 1.8
+#      and zero blocked tasks. With walks off, the same code ran for hours.
+#   2. what is left is the multi-gen LRU itself: generation lists, eviction at
+#      the oldest generation, refault accounting. That is the part that is
+#      supposed to make a phone feel smooth, and it is running from boot.
 #
-# and a plain reboot also leaves it off, because the default is off.
+#   cat /sys/kernel/mm/lru_gen/enabled    -> 0x0001   (core only)
+#   echo 7 > /sys/kernel/mm/lru_gen/enabled           -> add the walk back
+#   echo 1 > /sys/kernel/mm/lru_gen/enabled           -> core only again
+#
+# The cost, stated: without the walk, hot pages are not promoted by the aging
+# path. That is the "sluggish after hours" trade this phone has seen once before.
+# If the walk turns out to be safe, `echo 7` proves it in one session and the
+# early_initcall comes out; if it freezes, the phone reboots into a core-only
+# kernel that works.
 # ---------------------------------------------------------------------------
 CONFIG_LRU_GEN=y
-# CONFIG_LRU_GEN_ENABLED is not set
+CONFIG_LRU_GEN_ENABLED=y
 # CONFIG_LRU_GEN_STATS is not set
 
 # ---------------------------------------------------------------------------
