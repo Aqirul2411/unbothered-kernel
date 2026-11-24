@@ -69,12 +69,22 @@ esac
 # Both identities use KernelSU-Next: that is what the phone runs (see
 # configs/identity.env for the config evidence), so reproducing it and shipping
 # our own are the same root stack.
-if [ "$KSU" != "yes" ]; then
+#
+# ALLOW_NO_ROOT=1 exists for one purpose: bisecting a base that does not boot.
+# With it, a diagnostic build can be produced with no root at all, which is how
+# "is it the root stack or the tree?" gets answered without guessing. It never
+# applies to a shipping build: configs/identity.env sets it to 0, and only a
+# deliberate commit or a workflow env can change that.
+if [ "$KSU" != "yes" ] && [ "${ALLOW_NO_ROOT:-0}" != "1" ]; then
   die "IDENTITY=$IDENTITY expects KSU=yes (KernelSU-Next), got KSU=$KSU.
   The phone runs KernelSU-Next: its config carries CONFIG_KSU_SAMSUNG_KDP/RKP/
   DEFEX, CONTAINER_COMPAT and THRONE_TRACKER, and none of BakaSU's options.
   A different root flavour changes the CONFIG_KSU_* block, so the config diff
   would stop proving that we built the kernel the phone already boots."
+fi
+if [ "$KSU" = "no" ]; then
+  say "ROOT OFF: KSU=no with ALLOW_NO_ROOT=1. This image cannot install modules,"
+  say "          and it exists only to separate the root stack from the tree."
 fi
 
 say "identity: $IDENTITY  (kernel name: $NAME, built by $KUSER@$KHOST)"
