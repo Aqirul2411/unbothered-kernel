@@ -122,12 +122,20 @@ if [ "$IDENTITY" = "own" ]; then
 fi
 if [ "$IDENTITY" = "own" ] && [ "$TUNING" != "off" ]; then
   case "$TUNING" in
-    on)      TUNING_FILE="$ROOT/configs/tuning.fragment" ;;
-    nodebug) TUNING_FILE="$ROOT/configs/tuning-nodebug.fragment" ;;
-    *)       die "TUNING must be on, off or nodebug, got '$TUNING'" ;;
+    on)      TUNING_FILES=("$ROOT/configs/tuning.fragment") ;;
+    nodebug) TUNING_FILES=("$ROOT/configs/tuning-nodebug.fragment") ;;
+    # diag = the shipping tuning plus the panic-on-hang addendum. It exists to
+    # produce a stack trace from a hang that would otherwise leave pstore empty,
+    # and it reboots on a stall, so it is never a release build.
+    diag)    TUNING_FILES=("$ROOT/configs/tuning.fragment" "$ROOT/configs/tuning-diag.fragment") ;;
+    *)       die "TUNING must be on, off, nodebug or diag, got '$TUNING'" ;;
   esac
-  cp "$TUNING_FILE" "$WORK/tuning.fragment"
-  say "tuning: $TUNING ($(grep -cE '^(CONFIG_|# CONFIG_)' "$WORK/tuning.fragment") settings from $(basename "$TUNING_FILE"))"
+  : > "$WORK/tuning.fragment"
+  for _f in "${TUNING_FILES[@]}"; do
+    [ -f "$_f" ] || die "tuning file missing: $_f"
+    cat "$_f" >> "$WORK/tuning.fragment"
+  done
+  say "tuning: $TUNING ($(grep -cE '^(CONFIG_|# CONFIG_)' "$WORK/tuning.fragment") settings from $(basename -a "${TUNING_FILES[@]}" | paste -sd+ -))"
 else
   say "tuning: off (no config changes this build)"
 fi

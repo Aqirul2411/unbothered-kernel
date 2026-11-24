@@ -1,0 +1,41 @@
+# ---------------------------------------------------------------------------
+# DIAGNOSTIC ADDENDUM - only for TUNING=diag builds. Never shipped.
+#
+# Every MGLRU freeze on this phone so far has been invisible for one reason: a
+# hang is not an oops. Nothing panics, so nothing is written to pstore, and the
+# next boot shows an empty /sys/fs/pstore. This build changes that.
+#
+# What it does:
+#   - a task blocked for longer than 60 s panics instead of sitting there
+#     ("task:xxx blocked for more than 60 seconds" + the stack of the blocked
+#     task, which for a reclaim deadlock is the trace we have never had);
+#   - a CPU spinning with interrupts off panics after the softlockup watchdog
+#     fires (caught by the same trace mechanism);
+#   - PANIC_TIMEOUT=5 is already in the main fragment, so the phone reboots
+#     itself a few seconds later and the trace survives in
+#     /sys/fs/pstore/console-ramoops-0 for the next boot to read.
+#
+# The cost, stated plainly: this build reboots itself when something stalls,
+# which the daily-driver fragment deliberately avoids. It exists to be used
+# once, with MGLRU switched on by hand, to produce a stack.
+# ---------------------------------------------------------------------------
+CONFIG_DETECT_HUNG_TASK=y
+CONFIG_DEFAULT_HUNG_TASK_TIMEOUT=60
+CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
+CONFIG_BOOTPARAM_HUNG_TASK_PANIC_VALUE=1
+
+CONFIG_SOFTLOCKUP_DETECTOR=y
+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
+CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC_VALUE=1
+CONFIG_WATCHDOG=y
+CONFIG_WATCHDOG_CORE=y
+CONFIG_LOCKUP_DETECTOR=y
+
+# A panic must land in pstore, uncompressed, before the reboot.
+CONFIG_PSTORE=y
+CONFIG_PSTORE_RAM=y
+CONFIG_PSTORE_CONSOLE=y
+CONFIG_PSTORE_PMSG=y
+CONFIG_PANIC_ON_OOPS=y
+CONFIG_PANIC_ON_OOPS_VALUE=1
+CONFIG_PANIC_TIMEOUT=5
