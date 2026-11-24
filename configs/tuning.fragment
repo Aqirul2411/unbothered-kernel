@@ -381,28 +381,26 @@ CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protect
 # difference in vmscan.c, and without the Xiaomi page flag (PG_oem_reserved_5)
 # that this tree does not have.
 #
-# CONFIG_LRU_GEN_ENABLED is ON. Two things make that safe to boot with, and
-# neither of them is hope:
+# CONFIG_LRU_GEN_ENABLED is ON, and the page-table walk is ON with it - but only
+# from kswapd. Tree commit 1cc080e74e6a makes lru_gen_look_around() promote only
+# when a reclaim walk is attached and the caller is kswapd, which does two things
+# at once:
 #
-#   1. tree commit b9bee4f6d9f5 disables LRU_GEN_MM_WALK (and the inert
-#      NONLEAF_YOUNG) at early_initcall, so the kernel comes up core-only
-#      instead of with every capability. The walk is the one thing this phone has
-#      never survived: with walks on it froze 15 s after the PIN on the 2022
-#      backport, and inside two minutes on the newer generation with load 1.8
-#      and zero blocked tasks. With walks off, the same code ran for hours.
-#   2. what is left is the multi-gen LRU itself: generation lists, eviction at
-#      the oldest generation, refault accounting. That is the part that is
-#      supposed to make a phone feel smooth, and it is running from boot.
+#   - without a walk attached that function takes pgdat->lru_lock under the PTE
+#     lock, the PTL -> LRU order it warns about; kswapd always has a walk, so
+#     that case is removed rather than guarded;
+#   - direct reclaim no longer walks page tables inside a task that is blocked on
+#     its own page - the PIN-then-open-an-app case that froze this phone.
 #
-#   cat /sys/kernel/mm/lru_gen/enabled    -> 0x0001   (core only)
-#   echo 7 > /sys/kernel/mm/lru_gen/enabled           -> add the walk back
-#   echo 1 > /sys/kernel/mm/lru_gen/enabled           -> core only again
+# Why the walk is back: core-only ran five hours without hanging and thrashed.
+# Hot file pages were never promoted, so kswapd evicted and re-faulted them
+# (+378/s idle, +6,000/s in use, MemAvailable 1.7 GB). Stable and slow is not a
+# win, so the walk returns with the guard that makes it survivable.
 #
-# The cost, stated: without the walk, hot pages are not promoted by the aging
-# path. That is the "sluggish after hours" trade this phone has seen once before.
-# If the walk turns out to be safe, `echo 7` proves it in one session and the
-# early_initcall comes out; if it freezes, the phone reboots into a core-only
-# kernel that works.
+#   cat /sys/kernel/mm/lru_gen/enabled    -> 0x0003   (core + walk)
+#   echo 1 > /sys/kernel/mm/lru_gen/enabled           -> core only, if the walk
+#                                                        misbehaves
+#   echo 0 > /sys/kernel/mm/lru_gen/enabled           -> stock LRU
 # ---------------------------------------------------------------------------
 CONFIG_LRU_GEN=y
 CONFIG_LRU_GEN_ENABLED=y
