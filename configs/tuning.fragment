@@ -381,24 +381,27 @@ CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protect
 # difference in vmscan.c, and without the Xiaomi page flag (PG_oem_reserved_5)
 # that this tree does not have.
 #
-# CONFIG_LRU_GEN_ENABLED is ON, with the page-table walks OFF and a one-second
-# floor under ageing. That is the only combination this phone has survived, and
-# each part is there for a measured reason:
+# CONFIG_LRU_GEN is compiled, but OFF at boot: stock LRU is what runs.
 #
-#   walks off   direct-reclaim walks froze it at the PIN (2022 backport), and the
-#               kswapd-only walk froze it at the lock screen on first boot. The
-#               ageing walk (walk_mm/walk_pmd_range) scans every process's page
-#               tables; lru_gen_look_around only promotes during eviction, which
-#               is why guarding that changed nothing.
-#   min_ttl=1s  without walks, every page aged out immediately, was evicted and
-#               was faulted straight back: ~380 file refaults/s idle, ~6,000/s
-#               using Facebook or TikTok. lru_gen_age_node() now refuses to age a
-#               generation younger than a second (tree 892854a11a33).
+# Every configuration was measured on this phone, and none of the MGLRU ones is
+# good enough to be the default:
 #
-#   cat /sys/kernel/mm/lru_gen/enabled      -> 0x0001  (core only)
-#   cat /sys/kernel/mm/lru_gen/min_ttl_ms   -> 1000
-#   echo 7 > /sys/kernel/mm/lru_gen/enabled           -> walks, for testing only
-#   echo 0 > /sys/kernel/mm/lru_gen/enabled           -> stock LRU
+#   walks on, direct reclaim     froze at the PIN
+#   walks on, kswapd only        froze at the lock screen on first boot
+#   core only, min_ttl 0         stable, ~6,000 file refaults/s in use -> lag
+#   core only, min_ttl 1 s       75 OOM kills in one stretch -> apps killed
+#   core only, min_ttl 5 s       7 OOM kills/min -> the app-switch stutter
+#   MGLRU off (stock LRU)        0 OOM kills, smooth
+#
+# Without the page-table walks MGLRU cannot promote hot pages, and trying to
+# protect them with an ageing floor starves reclaim until the OOM killer fires.
+# So the default is the configuration that is actually smooth, and MGLRU stays
+# in the kernel for experiments:
+#
+#   echo 1 > /sys/kernel/mm/lru_gen/enabled    -> MGLRU core only (boot with it)
+#   echo 0 > /sys/kernel/mm/lru_gen/enabled    -> stock LRU; note the sysfs node
+#                                                 disappears, so it takes a
+#                                                 reboot to switch back on
 # ---------------------------------------------------------------------------
 CONFIG_LRU_GEN=y
 CONFIG_LRU_GEN_ENABLED=y
