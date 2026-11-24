@@ -388,3 +388,25 @@ CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protect
 CONFIG_LRU_GEN=y
 CONFIG_LRU_GEN_ENABLED=y
 # CONFIG_LRU_GEN_STATS is not set
+
+# ---------------------------------------------------------------------------
+# 14. Global synx, so the tree's own techpack compiles.
+#
+# The first build of this base stopped at:
+#   techpack/cvp/msm/eva/msm_cvp_internal.h:314: error: field has incomplete
+#   type 'struct synx_session'
+# and the reason is not a missing driver, it is the include: synx_api.h wraps
+# the whole definition in
+#   #if IS_REACHABLE(CONFIG_MSM_GLOBAL_SYNX)
+# while techpack/cvp builds its msm-cvp module unconditionally - Kbuild there is
+# obj-y += msm/ then obj-m += msm-cvp.o, with no dependency on
+# CONFIG_MSM_CVP at all. A GKI defconfig has no synx, so the type is absent and
+# the module cannot compile.
+#
+# marble_defconfig - what the shipped bouquet image was built from - has this as
+# =m, and so does this fragment. The module is discarded: we install the Image
+# only and the ROM keeps its own synx.ko in vendor_dlkm. What is not optional is
+# that the rest of techpack still builds, because vendor modules resolve symbols
+# against techpack/stub at load time.
+# ---------------------------------------------------------------------------
+CONFIG_MSM_GLOBAL_SYNX=m
