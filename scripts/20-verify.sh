@@ -39,7 +39,19 @@ warn() { echo "WARN: $*" >&2; }
 say() { echo "[verify] $*"; }
 
 [ -f "$IMAGE" ] || die "no image at $IMAGE"
-[ -f "$REF" ]   || die "no reference config at $REF"
+
+# A new base has no booting reference of its own yet. Recording is opt-in
+# (VERIFY_RECORD=1) and only possible when the reference file does not exist, so
+# it can never quietly replace a reference that we already trust: with the file
+# present, the normal diff runs and this branch is not reached.
+RECORD=0
+if [ ! -f "$REF" ] && [ "${VERIFY_RECORD:-0}" = "1" ]; then
+  RECORD=1
+  warn "VERIFY_RECORD=1 and no $REF: this build's own config becomes the reference."
+  warn "That proves nothing about booting - the boot test is the gate for this one."
+else
+  [ -f "$REF" ] || die "no reference config at $REF"
+fi
 mkdir -p "$OUT"
 
 say "identity $IDENTITY   ksu $KSU   reference $(basename "$REF")"
@@ -62,6 +74,12 @@ data = gzip.GzipFile(fileobj=io.BytesIO(blob[start + 8:end])).read()
 open(dst, "wb").write(data)
 print("  %d bytes, %d lines -> %s" % (len(data), data.count(b"\n"), dst))
 PY
+
+if [ "$RECORD" = "1" ]; then
+  cp "$OUT/built.config" "$REF"
+  say "recorded $REF from this build"
+  say "this diff is therefore empty BY CONSTRUCTION, not because it was verified"
+fi
 
 diff -u "$REF" "$OUT/built.config" > "$OUT/config.diff" || true
 
