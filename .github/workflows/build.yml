@@ -9,9 +9,9 @@ on:
         options: [repro, own]
         default: repro
       tuning:
-        description: "on = apply configs/tuning.fragment; off = same commit without tuning (bisect switch)"
+        description: "on = apply configs/tuning.fragment; off = same commit without tuning (bisect switch); diag = shipping tuning + panic-on-hang, for one reproduction"
         type: choice
-        options: ["on", "off", "nodebug"]
+        options: ["on", "off", "nodebug", "diag"]
         default: on
       ksun_sha:
         description: "optional: override the KernelSU-Next pin for one run (empty = configs/pins.env)"
