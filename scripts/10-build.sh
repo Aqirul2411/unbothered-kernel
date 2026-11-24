@@ -390,6 +390,13 @@ edit("anykernel clone",
          # Same for the install script: ours takes the kernel and leaves the
          # ramdisk alone. See assets/anykernel.sh for what was removed and why.
          '[ -f "$WORKDIR/anykernel.sh" ] && cp -f "$WORKDIR/anykernel.sh" anykernel/anykernel.sh',
+         # And the payload AK3 would copy into the ramdisk: vortex.sh disables
+         # thermal throttling and forces the performance governor. Our installer
+         # never runs the injection, but shipping the file at all is a promise
+         # ("kernel only, ramdisk untouched") that should not depend on a
+         # conditional in a shell script. Removed from the package entirely.
+         'rm -rf anykernel/ramdisk/sbin/vortex.sh',
+         'rmdir anykernel/ramdisk/sbin anykernel/ramdisk 2>/dev/null || true',
      ]))
 
 for label, old, new, count in edits:
