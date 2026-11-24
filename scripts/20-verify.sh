@@ -230,8 +230,19 @@ for opt in CONFIG_LTO_CLANG_THIN=y CONFIG_CFI_CLANG=y; do
   grep -qx "$opt" "$OUT/built.config" || die "expected $opt in the built config"
 done
 if [ "$KSU" = "no" ]; then
-  grep -qx '# CONFIG_KSU is not set' "$OUT/built.config" \
-    || die "KSU=no, but CONFIG_KSU is enabled in the built config"
+  # Absent is a third state, and it is the correct one for a build with no root
+  # driver: without drivers/kernelsu there is no CONFIG_KSU symbol at all, so
+  # kconfig writes neither "=y" nor "is not set". This check used to demand the
+  # latter and failed a good kernel - the first no-root build ever produced.
+  if grep -qx 'CONFIG_KSU=y' "$OUT/built.config"; then
+    die "KSU=no, but CONFIG_KSU is enabled in the built config"
+  fi
+  if grep -q 'CONFIG_KSU' "$OUT/built.config"; then
+    warn "KSU=no, but the config still mentions CONFIG_KSU:"
+    grep -n 'CONFIG_KSU' "$OUT/built.config" | head -5 | sed 's/^/    /'
+  else
+    say "root: none (CONFIG_KSU absent from the config, as expected with no driver)"
+  fi
   say "lto/cfi: present, root: none (as asked)"
 else
   for opt in CONFIG_KSU=y CONFIG_KSU_SUSFS=y; do

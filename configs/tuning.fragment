@@ -358,8 +358,8 @@ CONFIG_CPU_IDLE_GOV_AEGIS=y
 CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protected cgroup_disable=pressure cgroup.memory=nokmem cpuidle.governor=aegis"
 
 # ---------------------------------------------------------------------------
-# 13. MGLRU (multi-generational LRU), on a tree whose MGLRU is not the 2022
-#     backport.
+# 13. MGLRU (multi-generational LRU): the newer generation, built but not
+#     switched on.
 #
 # History on this phone, all of it measured: MGLRU merged (hung after the PIN),
 # walks off (never promotes, sluggish after hours), PTE-lock inversion removed
@@ -368,25 +368,32 @@ CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protect
 # entered, everything stops.
 #
 # The code those builds carried was Google's original backport to
-# android12-5.10. Bouquet - the same SoC, the same ROM, the same 5.10 line, and
-# a kernel that ships with MGLRU on - carries a newer generation of it:
-# LRU_REFS_MASK reference counting, page_update_gen() taking the vma flags,
-# full_scan instead of force_scan, a node bitmap in lru_gen_mm_state,
-# memory.reclaim proactive reclaim, and a memcg path that reclaims the root
-# slabs before descending into a non-root cgroup. Porting that generation into a
-# tree with our own vendor deltas was the alternative; vmscan.c alone differs
-# from it by about 2500 lines. Taking the maintained tree is the other, and it
-# is the one this build does.
+# android12-5.10. Bouquet - the same SoC, the same ROM, the same 5.10 line - is
+# a kernel that ships with MGLRU on, and its implementation is a newer
+# generation of the feature: LRU_REFS_MASK reference counting,
+# page_update_gen() taking the vma flags, full_scan instead of force_scan, a
+# per-node set in lru_gen_mm_state, and executable-page activation.
 #
-# So these two lines ask for the feature; the implementation under them is not
-# ours, and none of the three guards we wrote exists in it.
+# Taking that whole tree was tried and did not boot here - stuck at the POCO
+# logo, twice, with no trace reachable - and it put this phone into a fastboot
+# rescue. So the generation itself was ported into this tree instead, as commit
+# 157a999f7fc: only the MGLRU hunks, none of the other ~1900 lines of
+# difference in vmscan.c, and without the Xiaomi page flag (PG_oem_reserved_5)
+# that this tree does not have.
 #
-# Rollback without a rebuild: echo 0 > /sys/kernel/mm/lru_gen/enabled returns to
-# the stock LRU immediately; flashing ack274-aegis-sched (sched2) undoes the
-# whole base change.
+# CONFIG_LRU_GEN_ENABLED is deliberately OFF. The code is compiled; the stock
+# LRU is what runs at boot, so this build behaves exactly like sched2 until
+# somebody asks otherwise. That is the difference between an experiment and a
+# brick when the build cannot be tested before it is flashed:
+#
+#   turn it on    echo 0x7 > /sys/kernel/mm/lru_gen/enabled
+#   check it      cat /sys/kernel/mm/lru_gen/enabled      (0x0007 = on)
+#   turn it off   echo 0    > /sys/kernel/mm/lru_gen/enabled
+#
+# and a plain reboot also leaves it off, because the default is off.
 # ---------------------------------------------------------------------------
 CONFIG_LRU_GEN=y
-CONFIG_LRU_GEN_ENABLED=y
+# CONFIG_LRU_GEN_ENABLED is not set
 # CONFIG_LRU_GEN_STATS is not set
 
 # ---------------------------------------------------------------------------
