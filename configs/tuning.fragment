@@ -388,3 +388,27 @@ CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protect
 CONFIG_LRU_GEN=y
 CONFIG_LRU_GEN_ENABLED=y
 # CONFIG_LRU_GEN_STATS is not set
+
+# ---------------------------------------------------------------------------
+# 15. Skip the __cfi_check call, as the kernel this phone runs does.
+#
+# This is ACK's own option (arch/Kconfig), not a KSU invention:
+#
+#   config CFI_FORCE_SKIP_CHECK
+#           bool "Skip execution of __cfi_check function"
+#           def_bool y if CLANG_VERSION >= 190100 && CLANG_VERSION <= 210100
+#
+# i.e. a workaround for the clang releases that miscompile the check. Which of
+# the two states a build lands in therefore depends on the toolchain, not on a
+# decision: our previous tree pinned it =y, this tree's defconfig leaves it to
+# the version test and the runner's clang falls outside the buggy range, so it
+# came out off - the single layout-adjacent difference between this build and
+# the one on the phone.
+#
+# It is set here to match what is running today. The trade is stated: with this
+# on, a control-flow violation at an indirect call site is not reported at all.
+# That is what every build this phone has booted did, including the two vendor
+# drivers injected into it at build time (vortex_gki.c, governor-vortexcore.c),
+# whose code this build carries unchanged.
+# ---------------------------------------------------------------------------
+CONFIG_CFI_FORCE_SKIP_CHECK=y
