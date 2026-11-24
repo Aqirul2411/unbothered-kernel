@@ -381,25 +381,23 @@ CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protect
 # difference in vmscan.c, and without the Xiaomi page flag (PG_oem_reserved_5)
 # that this tree does not have.
 #
-# CONFIG_LRU_GEN_ENABLED is ON, and the page-table walk is ON with it - but only
-# from kswapd. Tree commit 1cc080e74e6a makes lru_gen_look_around() promote only
-# when a reclaim walk is attached and the caller is kswapd, which does two things
-# at once:
+# CONFIG_LRU_GEN_ENABLED is ON, with the page-table walks OFF and a one-second
+# floor under ageing. That is the only combination this phone has survived, and
+# each part is there for a measured reason:
 #
-#   - without a walk attached that function takes pgdat->lru_lock under the PTE
-#     lock, the PTL -> LRU order it warns about; kswapd always has a walk, so
-#     that case is removed rather than guarded;
-#   - direct reclaim no longer walks page tables inside a task that is blocked on
-#     its own page - the PIN-then-open-an-app case that froze this phone.
+#   walks off   direct-reclaim walks froze it at the PIN (2022 backport), and the
+#               kswapd-only walk froze it at the lock screen on first boot. The
+#               ageing walk (walk_mm/walk_pmd_range) scans every process's page
+#               tables; lru_gen_look_around only promotes during eviction, which
+#               is why guarding that changed nothing.
+#   min_ttl=1s  without walks, every page aged out immediately, was evicted and
+#               was faulted straight back: ~380 file refaults/s idle, ~6,000/s
+#               using Facebook or TikTok. lru_gen_age_node() now refuses to age a
+#               generation younger than a second (tree 892854a11a33).
 #
-# Why the walk is back: core-only ran five hours without hanging and thrashed.
-# Hot file pages were never promoted, so kswapd evicted and re-faulted them
-# (+378/s idle, +6,000/s in use, MemAvailable 1.7 GB). Stable and slow is not a
-# win, so the walk returns with the guard that makes it survivable.
-#
-#   cat /sys/kernel/mm/lru_gen/enabled    -> 0x0003   (core + walk)
-#   echo 1 > /sys/kernel/mm/lru_gen/enabled           -> core only, if the walk
-#                                                        misbehaves
+#   cat /sys/kernel/mm/lru_gen/enabled      -> 0x0001  (core only)
+#   cat /sys/kernel/mm/lru_gen/min_ttl_ms   -> 1000
+#   echo 7 > /sys/kernel/mm/lru_gen/enabled           -> walks, for testing only
 #   echo 0 > /sys/kernel/mm/lru_gen/enabled           -> stock LRU
 # ---------------------------------------------------------------------------
 CONFIG_LRU_GEN=y
