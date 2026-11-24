@@ -204,6 +204,25 @@ edit("kernel clone",
          'done',
      ]))
 
+# techpack: the vendor driver tree that the ROM already provides as modules.
+#
+# The bouquet tree carries techpack/, and its Kbuild builds every subdirectory
+# unconditionally (TECHPACK?=y, then `obj-y += msm/` and `obj-m += msm-cvp.o`),
+# so a GKI defconfig compiles a pile of device modules that this build then
+# throws away - and they are written for a full device config: with
+# CONFIG_MSM_GLOBAL_SYNX unset, synx_api.h hides struct synx_session and
+# techpack/cvp does not compile at all.
+#
+# The kernel this phone runs today has no techpack directory, and the ROM's own
+# vendor_dlkm already carries those drivers, so the honest thing is to build
+# what we run. TECHPACK=n goes on the make command line so it reaches every
+# sub-make. Nothing exported is lost: techpack/stub/stub.c is one static
+# function with no EXPORT_SYMBOL.
+edit("techpack off",
+     "    -j$(nproc --all)\n    O=$OUTDIR\n  )",
+     "    -j$(nproc --all)\n    TECHPACK=n\n    O=$OUTDIR\n  )",
+     count=2)
+
 # the localversion suffix. build.sh asks git for a short hash and lets git
 #    choose how short: it derives the length from the repository's object count,
 #    so the same commit prints as 7 or 9 hex digits depending on how it was
