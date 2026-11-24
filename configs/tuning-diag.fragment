@@ -39,3 +39,18 @@ CONFIG_PSTORE_PMSG=y
 CONFIG_PANIC_ON_OOPS=y
 CONFIG_PANIC_ON_OOPS_VALUE=1
 CONFIG_PANIC_TIMEOUT=5
+
+# Live capture: the one thing pstore cannot do on this device.
+#
+#   ramoops reserved-memory:ramoops_region: failed to locate DT /reserved-memory resource
+#   ramoops: probe of reserved-memory:ramoops_region failed with error -22
+#
+# That is why every panic so far left nothing: there is no reserved-memory node
+# for pstore in this device's DTB, so the backend registers and then has nowhere
+# to write. Netconsole does not need the DTB, a partition or a reboot - it pipes
+# printk over UDP to a listener, so a panic is readable while it happens.
+#
+# DYNAMIC lets the target be configured at runtime through
+# /sys/kernel/config/netconsole, so no kernel argument and no rebuild per network.
+CONFIG_NETCONSOLE=y
+CONFIG_NETCONSOLE_DYNAMIC=y
