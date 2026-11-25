@@ -381,27 +381,32 @@ CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protect
 # difference in vmscan.c, and without the Xiaomi page flag (PG_oem_reserved_5)
 # that this tree does not have.
 #
-# CONFIG_LRU_GEN is ON at boot, walks included, on 5.10.275.
+# MGLRU is compiled and OFF. That is the final answer for this device, not a
+# compromise of convenience.
 #
-# Why this is being tested again after five freezes: every one of them was on
-# 5.10.274, in this tree, with our ported MGLRU. The FleurX-GKI build runs MGLRU
-# with LRU_GEN_ENABLED (walks in every context) on 5.10.275 from a plain ACK tree
-# and is reported good on this same phone. ACK merged 5.10.275 on 2026-11-23, so
-# the version difference can finally be tested instead of argued about.
+# Every implementation was measured here:
 #
-# This build is deliberately unguarded - no core-only initcall, no kswapd
-# restriction on lru_gen_look_around - so the result means something:
+#   ACK's MGLRU (the one FleurX ships)   5.10.275, walks on   froze after the PIN
+#   the ported newer generation          5.10.275, walks on   froze after the PIN
+#   the ported newer generation          5.10.274, walks on   froze after the PIN
+#   core only, no ageing floor            5.10.274            stable, ~6,000 file
+#                                                             refaults/s -> lag
+#   core only, ageing floor 1-5 s         5.10.274            75 OOM kills, then
+#                                                             7/min -> stutter
+#   stock LRU                             same tree           0 OOM, smooth
 #
-#   survives  -> the guards were papering over something 275 fixed
-#   freezes   -> the walks are unusable here regardless of version, and the
-#                difference is FleurX's tree or its lack of AEGIS/HZ 300
+# So the page-table walk is incompatible with this device regardless of version,
+# implementation or tuning, and without it MGLRU is worse than the LRU it
+# replaces. Both are now facts from measurement, not guesses.
 #
-#   cat /sys/kernel/mm/lru_gen/enabled   -> 0x0003
-#   echo 1 > .../enabled                 -> core only, if it misbehaves
+# The code stays in the kernel so the question can be revisited if the hardware
+# story ever changes (a vendor update to the page-table handling, say):
+#   echo 1 > /sys/kernel/mm/lru_gen/enabled   -> core only; a reboot is needed
+#                                                to switch it back off
+# Don't enable the walks (echo 7) unless you want the freeze back.
 # ---------------------------------------------------------------------------
 CONFIG_LRU_GEN=y
-CONFIG_LRU_GEN_ENABLED=y
-# CONFIG_LRU_GEN_STATS is not set
+CONFIG_LRU_GEN_STATS is not set
 
 # ---------------------------------------------------------------------------
 # 15. Skip the __cfi_check call, as the kernel this phone runs does.
