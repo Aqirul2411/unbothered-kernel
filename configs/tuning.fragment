@@ -406,7 +406,8 @@ CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protect
 # Don't enable the walks (echo 7) unless you want the freeze back.
 # ---------------------------------------------------------------------------
 CONFIG_LRU_GEN=y
-CONFIG_LRU_GEN_STATS is not set
+# CONFIG_LRU_GEN_ENABLED is not set
+# CONFIG_LRU_GEN_STATS is not set
 
 # ---------------------------------------------------------------------------
 # 15. Skip the __cfi_check call, as the kernel this phone runs does.

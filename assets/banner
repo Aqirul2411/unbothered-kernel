@@ -1,11 +1,45 @@
-
-    +--------------------------+
-    |   U N B O T H E R E D    |
-    +--------------------------+
-
-             -         -
-              \_______/
-
-
-        5.10.273  for  marble
-
++==========================================================================+
+|                                                                          |
+|    _   _       _           _   _                       _                 |
+|   | | | |_ __ | |__   ___ | |_| |__   ___ _ __ ___  __| |                |
+|   | |_| | '_ \| '_ \ / _ \| __| '_ \ / _ \ '__/ _ \/ _` |                |
+|   |  _  | | | | |_) | (_) | |_| | | |  __/ | |  __/ (_| |                |
+|   |_| |_|_| |_|_.__/ \___/ \__|_| |_|\___|_|  \___|\__,_|                |
+|                                                                          |
+|             5.10.275  -  kernel only, nothing else touched               |
++==========================================================================+
+|                                                                          |
+|  WHAT THIS IS                                                            |
+|    Linux 5.10.275, merged from Google's android12-5.10-lts on the        |
+|    23rd, not a relabelled 274. Same code the phone's vendor modules      |
+|    were built against.                                                   |
+|                                                                          |
+|  WHAT IT DOES FOR YOU                                                    |
+|    memory    stock multi-LRU - the one that does not freeze this SoC     |
+|              (MGLRU is compiled but OFF: every walk-enabled build,       |
+|               including FleurX's, froze at the PIN. Turn it on with      |
+|               echo 1 > /sys/kernel/mm/lru_gen/enabled if you are         |
+|               curious; do not enable the walks.)                        |
+|    idle      AEGIS governor compiled in - energy-ledger deep idle,       |
+|              selected by /data/adb/service.d/03-cpuidle-aegis.sh         |
+|    scheduler EAS capacity-inversion detection + bounded LLC idle scan    |
+|    power     workqueue power-efficient, RCU lazy callbacks, DAMON,       |
+|              300 Hz tick, INIT_ON_ALLOC off, KSM off                     |
+|    security  thin LTO + CFI, CFI check skipped as the stock kernel does  |
+|    root      KernelSU-Next + SUSFS, built in, no modules required        |
+|                                                                          |
+|  WHAT IT DOES NOT DO                                                     |
+|    It does not replace your ramdisk, your dtbo or your vendor modules.   |
+|    It writes one Image into boot and leaves everything else alone, so    |
+|    the ROM's own camera, display and modem drivers keep working.         |
+|    It does not hide thermals, force a governor, or tweak sysctls.        |
+|                                                                          |
+|  AFTER BOOT                                                              |
+|    uname -r                                 5.10.275-Unbothered/...      |
+|    cat /sys/kernel/mm/lru_gen/enabled        0x0000  (off, on purpose)   |
+|    cat /sys/devices/system/cpu/cpuidle/current_governor                  |
+|                                                                          |
+|  ROLLBACK                                                                |
+|    flash the previous zip, or fastboot flash boot <backup>.img           |
+|                                                                          |
++==========================================================================+
