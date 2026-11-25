@@ -381,31 +381,27 @@ CONFIG_CMDLINE="stack_depot_disable=on kasan.stacktrace=off kvm-arm.mode=protect
 # difference in vmscan.c, and without the Xiaomi page flag (PG_oem_reserved_5)
 # that this tree does not have.
 #
-# CONFIG_LRU_GEN is compiled, but OFF at boot: stock LRU is what runs.
+# CONFIG_LRU_GEN is ON at boot, walks included, on 5.10.275.
 #
-# Every configuration was measured on this phone, and none of the MGLRU ones is
-# good enough to be the default:
+# Why this is being tested again after five freezes: every one of them was on
+# 5.10.274, in this tree, with our ported MGLRU. The FleurX-GKI build runs MGLRU
+# with LRU_GEN_ENABLED (walks in every context) on 5.10.275 from a plain ACK tree
+# and is reported good on this same phone. ACK merged 5.10.275 on 2026-11-23, so
+# the version difference can finally be tested instead of argued about.
 #
-#   walks on, direct reclaim     froze at the PIN
-#   walks on, kswapd only        froze at the lock screen on first boot
-#   core only, min_ttl 0         stable, ~6,000 file refaults/s in use -> lag
-#   core only, min_ttl 1 s       75 OOM kills in one stretch -> apps killed
-#   core only, min_ttl 5 s       7 OOM kills/min -> the app-switch stutter
-#   MGLRU off (stock LRU)        0 OOM kills, smooth
+# This build is deliberately unguarded - no core-only initcall, no kswapd
+# restriction on lru_gen_look_around - so the result means something:
 #
-# Without the page-table walks MGLRU cannot promote hot pages, and trying to
-# protect them with an ageing floor starves reclaim until the OOM killer fires.
-# So the default is the configuration that is actually smooth, and MGLRU stays
-# in the kernel for experiments:
+#   survives  -> the guards were papering over something 275 fixed
+#   freezes   -> the walks are unusable here regardless of version, and the
+#                difference is FleurX's tree or its lack of AEGIS/HZ 300
 #
-#   echo 1 > /sys/kernel/mm/lru_gen/enabled    -> MGLRU core only (boot with it)
-#   echo 0 > /sys/kernel/mm/lru_gen/enabled    -> stock LRU; note the sysfs node
-#                                                 disappears, so it takes a
-#                                                 reboot to switch back on
+#   cat /sys/kernel/mm/lru_gen/enabled   -> 0x0003
+#   echo 1 > .../enabled                 -> core only, if it misbehaves
 # ---------------------------------------------------------------------------
 CONFIG_LRU_GEN=y
-# CONFIG_LRU_GEN_ENABLED is not set
-# CONFIG_LRU_GEN_STATS is not set
+CONFIG_LRU_GEN_ENABLED=y
+# CONFIG_LRU_GEN_STATS is not setCONFIG_LRU_GEN_STATS is not set
 
 # ---------------------------------------------------------------------------
 # 15. Skip the __cfi_check call, as the kernel this phone runs does.
