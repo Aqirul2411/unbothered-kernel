@@ -34,3 +34,15 @@
 # still shows up as a line here rather than disappearing from the comparison.
 ^(# )?CONFIG_ARM64_ERRATUM_3821522=
 ^(# )?CONFIG_ARM64_WORKAROUND_BROKEN_AMU_CONSTCNT=
+
+# 5.10.275 renamed a symbol the reference config still carries by its old name:
+# upstream's " mm/gup_benchmark: rename to gup_test\
+
+# 5.10.275 renamed a symbol the reference config still carries by its old name:
+# upstream's "mm/gup_benchmark: rename to gup_test" turns CONFIG_GUP_BENCHMARK
+# into CONFIG_GUP_TEST. Same feature, same state (both off in this build); the
+# reference predates the rename, so the pair shows up as a difference nobody
+# asked for. Accepted by name in both directions, so a build that actually
+# enables either one still fails.
+^(# )?CONFIG_GUP_BENCHMARK is not set$
+^(# )?CONFIG_GUP_TEST is not set$
