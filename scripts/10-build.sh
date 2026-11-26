@@ -241,6 +241,22 @@ edit("techpack off",
      "    -j$(nproc --all)\n    TECHPACK=n\n    O=$OUTDIR\n  )",
      count=2)
 
+# the clang toolchain
+#
+# Arkael's script downloads Neutron clang 30072026. That is a third-party build
+# of an unspecified upstream revision, and this kernel has been compiled with it
+# since the beginning - which makes every performance comparison we have made
+# "our tuning, on that compiler".
+#
+# Switched to Android's own prebuilt: r639965 (24.0.1) at
+# c85766b30cc6996057b3414cb30a8b2f0f98f75c, fetched as a single-tree archive so
+# the download is 438 MB rather than a multi-gigabyte git history. The pinned
+# script already extracts *.tar.* into $CLANG_DIR, so this is a URL change and
+# nothing else; the flattening step below it handles the layout either way.
+edit("clang toolchain",
+     'CLANG_URL="https://github.com/Neutron-Toolchains/clang-build-catalogue/releases/download/30072026/neutron-clang-30072026.tar.zst"',
+     'CLANG_URL="%s"' % want("CLANG_URL"))
+
 # the localversion suffix. build.sh asks git for a short hash and lets git
 #    choose how short: it derives the length from the repository's object count,
 #    so the same commit prints as 7 or 9 hex digits depending on how it was
