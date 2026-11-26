@@ -46,3 +46,13 @@
 # enables either one still fails.
 ^(# )?CONFIG_GUP_BENCHMARK is not set$
 ^(# )?CONFIG_GUP_TEST is not set$
+
+# The toolchain's own version stamps. Every build before this one was compiled by
+# Neutron clang 30072026 (24.0.0git); this one by Android's prebuilt r639965
+# (24.0.1) at c85766b30cc6996057b3414cb30a8b2f0f98f75c. Those four symbols are
+# the compiler describing itself, so they must differ - there is no build where
+# they should match a config produced by a different compiler.
+^(# )?CONFIG_CC_VERSION_TEXT=
+^(# )?CONFIG_CLANG_VERSION=
+^(# )?CONFIG_AS_VERSION=
+^(# )?CONFIG_LLD_VERSION=
