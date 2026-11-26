@@ -146,6 +146,11 @@ fi
 # edit that silently did nothing.
 export NAME KUSER KHOST
 export KERNEL_REPO KERNEL_BRANCH KERNEL_SHA KERNEL_CLONE_DEPTH KERNEL_SHORT_SHA
+# CLANG_URL is read by the python block below through os.environ, so it has to be
+# exported like the kernel pins. Sourcing pins.env makes it a shell variable
+# only, and the first attempt at the clang switch failed with "CLANG_URL is
+# empty" for exactly that reason.
+export CLANG_URL
 export BUILD_SHA BAKASU_SETUP_SHA BAKASU_DRIVER_SHA KSUN_SHA
 export INFINIX_CAM_SHA256
 export SUSFS_SHA SUSFS_CLONE_DEPTH SUKISU_PATCH_SHA ANYKERNEL_SHA
